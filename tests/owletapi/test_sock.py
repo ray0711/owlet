@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from custom_components.owlet.owletapi.api import OwletAPI
+from custom_components.owlet.owletapi.exceptions import OwletReadOnlyError
 from custom_components.owlet.owletapi.sock import (
     Sock,
     decode_bool,
@@ -21,6 +22,7 @@ from .conftest import BASE, DSN, FakeSession, load
 
 PROPERTIES_URL = f"{BASE}/dsns/{DSN}/properties.json"
 ACTIVATE_URL = f"{BASE}/dsns/{DSN}/properties/APP_ACTIVE/datapoints.json"
+COMMAND_URL = f"{BASE}/dsns/{DSN}/properties/BASE_STATION_ON_CMD/datapoints.json"
 
 REMOVE = object()
 
@@ -88,10 +90,26 @@ def test_last_updated_without_data(sock: Sock) -> None:
     assert sock.last_updated_at is None
 
 
-def test_sock_has_no_control_methods(sock: Sock) -> None:
-    """The sock model is read-only, there is nothing that could change the base station."""
-    assert not hasattr(sock, "control_base_station")
-    assert not hasattr(sock.api, "post_command")
+async def test_control_base_station_refused_by_default(
+    mock_api: FakeSession, sock: Sock
+) -> None:
+    """The base station command is refused unless control was enabled."""
+    with pytest.raises(OwletReadOnlyError):
+        await sock.control_base_station(False)
+    assert not mock_api.requests
+
+
+async def test_control_base_station(
+    mock_api: FakeSession, control_api: OwletAPI
+) -> None:
+    control_sock = Sock(
+        control_api, {"dsn": DSN, "product_name": "Owlet Baby Monitors"}
+    )
+    mock_api.post(COMMAND_URL, payload={"datapoint": {}})
+
+    assert await control_sock.control_base_station(False) is True
+    body = mock_api.requests[("POST", COMMAND_URL)][0].kwargs["json"]
+    assert '"val": "false"' in body["datapoint"]["value"]
 
 
 async def test_device_status_properties_are_decoded(

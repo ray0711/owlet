@@ -4,12 +4,13 @@ from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 import logging
 from logging import Logger
+import re
 import time
 from typing import Any, NotRequired, TypedDict
 
 import aiohttp
 
-from .const import REGION_INFO, WRITABLE_PROPERTIES
+from .const import CONTROL_PROPERTIES, REGION_INFO, WRITABLE_PROPERTIES
 from .exceptions import (
     OwletAuthenticationError,
     OwletConnectionError,
@@ -32,12 +33,19 @@ MAX_RETRY_AFTER = 3600.0
 TOO_MANY_ATTEMPTS_BACKOFF = 900.0
 
 
-def _is_allowed_write(url: str) -> bool:
-    """Return True when a write targets one of the properties this client may set."""
-    return any(
-        url.endswith(f"/properties/{name}/datapoints.json")
-        for name in WRITABLE_PROPERTIES
-    )
+_WRITE_URL = re.compile(
+    r"/dsns/[^/?#%\\]+/properties/(?P<name>[A-Za-z0-9_]+)/datapoints\.json"
+)
+
+
+def _is_allowed_write(url: str, writable: frozenset[str]) -> bool:
+    """Return True when a write targets exactly one of the writable properties.
+
+    The whole path is matched, so a query string, a fragment or extra path
+    segments can never smuggle another property past the check.
+    """
+    match = _WRITE_URL.fullmatch(url)
+    return match is not None and match["name"] in writable
 
 
 def parse_retry_after(value: Any) -> float | None:
@@ -189,6 +197,7 @@ class OwletAPI:
         session: aiohttp.ClientSession | None = None,
         activation_interval: float = 0,
         timeout: float = 30,
+        allow_control: bool = False,
     ) -> None:
         """Sets all the necessary variables for the API caller based on the passed in information, if a session is not passed in then one is created.
 
@@ -204,6 +213,7 @@ class OwletAPI:
         activation_interval (float), optional:Minimum seconds between two APP_ACTIVE requests per device,
             0 (default) activates before every request like earlier releases
         timeout (float), optional:Total timeout in seconds for a single request to the Owlet API
+        allow_control (bool), optional:Also allow writing BASE_STATION_ON_CMD, False (default) keeps the client read-only apart from APP_ACTIVE
 
         """
         self._region = region
@@ -218,6 +228,11 @@ class OwletAPI:
         self._activation_interval = activation_interval
         self._last_activation: dict[str, float] = {}
         self._timeout = aiohttp.ClientTimeout(total=timeout)
+        self._writable = (
+            WRITABLE_PROPERTIES | CONTROL_PROPERTIES
+            if allow_control
+            else WRITABLE_PROPERTIES
+        )
         # Serialises token refreshes: several socks share one client, and two
         # concurrent polls must not both refresh (the second one would even
         # invalidate the token the first one just obtained).
@@ -649,6 +664,24 @@ class OwletAPI:
         )
         self._last_activation[device_serial] = time.monotonic()
 
+    async def post_command(
+        self,
+        device: str,
+        command: str,
+        data: dict[str, Any],
+    ) -> Any:
+        """Send a command property to the Owlet API and return the response.
+
+        Only works when the client was created with allow_control=True, any
+        other command is refused by _request. APP_ACTIVE is not written here,
+        that happens as part of polling.
+        """
+        return await self._request(
+            "POST",
+            f"/dsns/{device}/properties/{command}/datapoints.json",
+            data,
+        )
+
     async def _maybe_activate(self, device_serial: str, force: bool = False) -> None:
         """Activate the device unless it was activated within the activation interval.
 
@@ -732,8 +765,9 @@ class OwletAPI:
         """Send a request to the Owlet API and return the response.
 
         Anything other than a GET is refused unless it writes one of the
-        WRITABLE_PROPERTIES, so this client can never change what the base
-        station does.
+        WRITABLE_PROPERTIES (plus CONTROL_PROPERTIES when allow_control is
+        set), so this client can never change what the base station does
+        unless that was explicitly enabled.
 
         Parameters
         ----------
@@ -746,9 +780,9 @@ class OwletAPI:
         dict: Dictionary containing the response
 
         """
-        if method != "GET" and not _is_allowed_write(url):
+        if method != "GET" and not _is_allowed_write(url, self._writable):
             raise OwletReadOnlyError(
-                f"Refusing {method} {url}: only {sorted(WRITABLE_PROPERTIES)} may be written"
+                f"Refusing {method} {url}: only {sorted(self._writable)} may be written"
             )
         await self.authenticate()
         reply = await self._send(method, url, data)

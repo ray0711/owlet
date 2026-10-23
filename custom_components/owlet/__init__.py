@@ -4,8 +4,9 @@ Originally created by Ryan Clark (https://github.com/ryanbdclark/owlet),
 continued by Lucas Vollebergh (https://github.com/lucasvollebergh/owlet), now
 maintained at https://github.com/idomp/owlet.
 
-This fork is read-only towards the Owlet cloud: the only property it ever
+This fork is read-only towards the Owlet cloud by default: the only property it
 writes is APP_ACTIVE, which tells the base station that a client is watching.
+Switching the base station on and off is an opt-in option ("allow_control").
 """
 
 from __future__ import annotations
@@ -29,9 +30,11 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     CONF_ACTIVATION_INTERVAL,
+    CONF_ALLOW_CONTROL,
     CONF_OWLET_EXPIRY,
     CONF_OWLET_REFRESH,
     DEFAULT_ACTIVATION_INTERVAL,
+    DEFAULT_ALLOW_CONTROL,
     DOMAIN,
     OWLET_CREDENTIAL_ERRORS,
     SUPPORTED_VERSIONS,
@@ -42,6 +45,7 @@ from .owletapi.exceptions import OwletConnectionError, OwletDevicesError, OwletE
 from .owletapi.sock import Sock
 
 PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR]
+CONTROL_PLATFORMS: list[Platform] = [Platform.SWITCH]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,6 +94,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: OwletConfigEntry) -> boo
         activation_interval=entry.options.get(
             CONF_ACTIVATION_INTERVAL, DEFAULT_ACTIVATION_INTERVAL
         ),
+        allow_control=allow_control(entry),
     )
 
     try:
@@ -126,29 +131,46 @@ async def async_setup_entry(hass: HomeAssistant, entry: OwletConfigEntry) -> boo
 
     entry.runtime_data = coordinators
 
-    _async_remove_switch_entities(hass, entry)
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _async_remove_stale_entities(hass, entry)
+    # Remember what was set up: the options may already have changed by the
+    # time the entry is unloaded for the reload that applies them.
+    platforms = _platforms(entry)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = platforms
+    await hass.config_entries.async_forward_entry_setups(entry, platforms)
 
     return True
 
 
-def _async_remove_switch_entities(hass: HomeAssistant, entry: OwletConfigEntry) -> None:
-    """Remove the base station switch left behind by earlier releases.
+def allow_control(entry: OwletConfigEntry) -> bool:
+    """Return True when the user opted in to switching the base station."""
+    return bool(entry.options.get(CONF_ALLOW_CONTROL, DEFAULT_ALLOW_CONTROL))
 
-    This fork never switches the base station on or off, the state is exposed
-    as a binary sensor instead, so a leftover switch would stay unavailable
-    forever.
+
+def _platforms(entry: OwletConfigEntry) -> list[Platform]:
+    """Return the platforms to set up, the switch only with control enabled."""
+    return PLATFORMS + CONTROL_PLATFORMS if allow_control(entry) else PLATFORMS
+
+
+def _async_remove_stale_entities(hass: HomeAssistant, entry: OwletConfigEntry) -> None:
+    """Remove the base station entity of the mode that is not active.
+
+    The base station is a switch with control enabled and a read-only binary
+    sensor otherwise. Both share one unique id, so after the option changes
+    the entity of the other kind would stay unavailable forever.
     """
+    stale = Platform.BINARY_SENSOR if allow_control(entry) else Platform.SWITCH
     registry = er.async_get(hass)
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
-        if entity.domain == Platform.SWITCH:
-            _LOGGER.info("Removing base station switch %s", entity.entity_id)
+        if entity.domain == stale and entity.unique_id.endswith("-base_station_on"):
+            _LOGGER.info("Removing base station entity %s", entity.entity_id)
             registry.async_remove(entity.entity_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: OwletConfigEntry) -> bool:
     """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+    platforms = hass.data.get(DOMAIN, {}).get(entry.entry_id, PLATFORMS)
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, platforms):
+        hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
         for coordinator in entry.runtime_data.values():
             ir.async_delete_issue(hass, DOMAIN, coordinator.stale_issue_id)
     return unload_ok

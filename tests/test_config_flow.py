@@ -10,6 +10,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.owlet.const import (
     CONF_ACTIVATION_INTERVAL,
+    CONF_ALLOW_CONTROL,
     CONF_STALE_THRESHOLD,
     DEFAULT_ACTIVATION_INTERVAL,
     DEFAULT_STALE_THRESHOLD,
@@ -86,6 +87,7 @@ async def test_user_flow(hass: HomeAssistant, mock_login: AsyncMock) -> None:
         CONF_SCAN_INTERVAL: POLLING_INTERVAL,
         CONF_STALE_THRESHOLD: DEFAULT_STALE_THRESHOLD,
         CONF_ACTIVATION_INTERVAL: DEFAULT_ACTIVATION_INTERVAL,
+        CONF_ALLOW_CONTROL: False,
     }
 
 
@@ -256,6 +258,7 @@ async def test_options_flow(
             CONF_SCAN_INTERVAL: 30,
             CONF_STALE_THRESHOLD: 0,
             CONF_ACTIVATION_INTERVAL: 120,
+            CONF_ALLOW_CONTROL: True,
         },
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -263,6 +266,7 @@ async def test_options_flow(
         CONF_SCAN_INTERVAL: 30,
         CONF_STALE_THRESHOLD: 0,
         CONF_ACTIVATION_INTERVAL: 120,
+        CONF_ALLOW_CONTROL: True,
     }
 
 

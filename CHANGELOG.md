@@ -1,6 +1,10 @@
 # Changelog
 
 <!--next-version-placeholder-->
+## Unreleased
+### Feature
+* New opt-in option **Allow base station control** (off by default). When enabled, the base station state becomes a **Base station on** switch again (same unique id) and the API client additionally accepts `BASE_STATION_ON_CMD`; every other write except `APP_ACTIVE` is still refused. With the option off nothing changes: read-only binary sensor, no way to switch the base station. Changing the option swaps the binary sensor and the switch automatically.
+
 ## 2026.10.1 (2026-10-12)
 ### Fix
 * No more gaps in the readings. Measured on a Dream Sock: the base station uploads vitals for about 45 seconds after `APP_ACTIVE` is written, then sets the flag back to 0 itself and stops, so the previous 60 s default left a gap of up to 30 s every minute. The integration now writes `APP_ACTIVE` again as soon as the cloud shows the base cleared it, and the activation interval (default now 30 s) is only a ceiling.

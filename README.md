@@ -22,7 +22,7 @@ A Home Assistant custom integration for the Owlet Smart Sock 2, Smart Sock 3 and
 
 ## What is different in this fork
 
-- **No switch, no control.** The base station switch is gone. The integration can never switch the base station on or off, so no automation, dashboard tap or voice assistant can stop the monitoring. The vendored API client refuses every write except `APP_ACTIVE`. The base station state is a read-only binary sensor.
+- **Read-only by default, base station control is opt-in.** Out of the box the integration can never switch the base station on or off, so no automation, dashboard tap or voice assistant can stop the monitoring. The vendored API client refuses every write except `APP_ACTIVE`, and the base station state is a read-only binary sensor. Enable **Allow base station control** in the integration options to get the **Base station on** switch back; the client then also accepts `BASE_STATION_ON_CMD` and still nothing else.
 - **Nothing stale is ever shown.** Every value is judged by the timestamp the cloud attached to the reading. When the reading is not fresh, everything taken from it is unavailable, including the alerts, the battery and the charging state. A reading without a usable timestamp is never fresh. Whether the sock is charging is only believed from a fresh reading, so an old reading cannot hide stale data behind "charging". See [Stale data detection](#stale-data-detection).
 - **Honest values.** A heart rate, oxygen or skin temperature of 0 and a ten minute average of 255 mean "not measuring" and show as unknown instead of being recorded. A null alert is unknown, not off. Unreadable fields never break the update.
 - **More of what the sock reports.** Discomfort alert, low integrity reading, the preview priority alarms, base monitoring status, battery status and the time of the last red alert.
@@ -55,7 +55,7 @@ The domain (`owlet`) and all entity unique ids are unchanged from ryanbdclark/ow
 2. Add this repository as a custom repository and download it, see above.
 3. Restart Home Assistant.
 
-The config entry is migrated automatically (the account identity now includes the region). The base station switch entity is removed on the first start; the state lives on in the **Base station on** binary sensor with the same unique id.
+The config entry is migrated automatically (the account identity now includes the region). Unless you enable **Allow base station control** in the options, the base station switch entity is removed on the first start; the state lives on in the **Base station on** binary sensor with the same unique id.
 
 ## Entities
 
@@ -70,7 +70,7 @@ Which entities appear depends on what your sock reports. Vitals are unavailable 
 
 A reading of 0 for heart rate, oxygen or skin temperature (and 255 for the ten minute oxygen average) means the sock is not measuring; those show as unknown and are never recorded as values. An alert the cloud reports as null is unknown, not off.
 
-There is no switch. This integration never changes anything on the base station: the only thing it ever writes to the Owlet cloud is the `APP_ACTIVE` flag that tells the base station a client is watching. The base station state is a read-only binary sensor.
+By default there is no switch. The only thing the integration writes to the Owlet cloud is the `APP_ACTIVE` flag that tells the base station a client is watching, and the base station state is a read-only binary sensor. With **Allow base station control** enabled in the options (off by default) the binary sensor is replaced by a **Base station on** switch with the same unique id, and `BASE_STATION_ON_CMD` is the one extra property that may be written. Turning the option off again brings the binary sensor back. The entity id changes domain (`binary_sensor.*` to `switch.*`), so automations, names and areas do not carry over, and the bundled dashboards keep pointing at the binary sensor.
 
 ### Stale data detection
 

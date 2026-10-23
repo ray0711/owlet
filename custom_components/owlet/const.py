@@ -11,6 +11,11 @@ CONF_OWLET_EXPIRY: Final = "expiry"
 CONF_OWLET_REFRESH: Final = "refresh"
 CONF_STALE_THRESHOLD: Final = "stale_threshold"
 CONF_ACTIVATION_INTERVAL: Final = "activation_interval"
+CONF_ALLOW_CONTROL: Final = "allow_control"
+
+# Opt-in: lets Home Assistant switch the base station on and off. Off by default,
+# then the client refuses every write except APP_ACTIVE.
+DEFAULT_ALLOW_CONTROL: Final = False
 
 # Seconds between two APP_ACTIVE writes per sock. APP_ACTIVE tells the base
 # station a client is watching, which makes it upload vitals. Measured on a

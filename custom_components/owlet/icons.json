@@ -66,6 +66,14 @@
       "battery_status": {
         "default": "mdi:battery-heart-variant"
       }
+    },
+    "switch": {
+      "base_on": {
+        "default": "mdi:router-wireless",
+        "state": {
+          "off": "mdi:router-wireless-off"
+        }
+      }
     }
   }
 }
