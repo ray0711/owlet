@@ -201,6 +201,10 @@ VALID_RANGES: dict[PropertyKey, tuple[float, float]] = {
 # on/off) can never be changed from Home Assistant.
 WRITABLE_PROPERTIES: frozenset[str] = frozenset({"APP_ACTIVE"})
 
+# Written only when the client is created with allow_control=True (opt-in in
+# the integration's options): the command that switches the base station.
+CONTROL_PROPERTIES: frozenset[str] = frozenset({"BASE_STATION_ON_CMD"})
+
 REGION_INFO: dict[str, dict[str, str]] = {
     "world": {
         "url_mini": "https://ayla-sso.owletdata.com/mini/",

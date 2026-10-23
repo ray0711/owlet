@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from . import OwletConfigEntry
+from . import OwletConfigEntry, allow_control
 from .coordinator import OwletCoordinator
 from .entity import OwletBaseEntity
 
@@ -36,8 +36,8 @@ SENSORS: tuple[OwletBinarySensorEntityDescription, ...] = (
         device_class=BinarySensorDeviceClass.BATTERY_CHARGING,
         available_during_charging=True,
     ),
-    # Read-only: this integration never switches the base station, it only
-    # reports what the sock says about it.
+    # Read-only state of the base station, replaced by a switch when the
+    # "allow_control" option is on.
     OwletBinarySensorEntityDescription(
         key="base_station_on",
         translation_key="base_station_on",
@@ -151,6 +151,8 @@ async def async_setup_entry(
 ) -> None:
     """Set up the owlet binary sensors from config entry."""
     sensors: list[BinarySensorEntity] = []
+    # With control on the base station state is a switch instead.
+    control = allow_control(config_entry)
 
     for coordinator in config_entry.runtime_data.values():
         properties = coordinator.sock.properties
@@ -158,6 +160,7 @@ async def async_setup_entry(
             OwletBinarySensor(coordinator, description)
             for description in SENSORS
             if description.key in properties
+            and not (description.key == "base_station_on" and control)
         )
         if OwletAwakeSensor.entity_description.key in properties:
             sensors.append(OwletAwakeSensor(coordinator))

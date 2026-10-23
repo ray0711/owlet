@@ -3,6 +3,7 @@ import json
 import logging
 from logging import Logger
 import math
+import time
 from typing import Any, NotRequired, TypedDict
 
 from .api import OwletAPI, SockData, TokenDict
@@ -399,3 +400,27 @@ class Sock:
             response["tokens"] = properties["tokens"]
 
         return response
+
+    async def control_base_station(self, on: bool) -> bool:
+        """Calls the Owlet api to turn the base station on or off, returns a bool if this was successful.
+
+        Refused with OwletReadOnlyError unless the API client was created with
+        allow_control=True.
+
+        Returns
+        -------
+        (bool):Was the command successful
+
+        """
+        value = json.dumps(
+            {"ts": int(time.time()), "val": "true" if on else "false"},
+        )
+        data = {"datapoint": {"metadata": {}, "value": value}}
+
+        response = await self._api.post_command(
+            self.serial,
+            "BASE_STATION_ON_CMD",
+            data,
+        )
+
+        return True if response else False

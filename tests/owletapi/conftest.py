@@ -135,6 +135,19 @@ def authed_api(session: FakeSession) -> OwletAPI:
     )
 
 
+@pytest.fixture
+def control_api(session: FakeSession) -> OwletAPI:
+    """Return an API client with a valid token and base station control enabled."""
+    return OwletAPI(
+        REGION,
+        token="valid_token",
+        expiry=time.time() + 3600,
+        refresh="refresh_token",
+        session=session,  # type: ignore[arg-type]
+        allow_control=True,
+    )
+
+
 def mock_login(mock_api: FakeSession, token: str = "new_token") -> None:
     """Mock the full password, refresh and sign in chain."""
     info = REGION_INFO[REGION]

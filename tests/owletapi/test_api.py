@@ -336,10 +336,11 @@ async def test_validate_authentication_returns_tokens_refreshed_before_check(
 @pytest.mark.parametrize(
     "url",
     [
-        f"/dsns/{DSN}/properties/BASE_STATION_ON_CMD/datapoints.json",
         f"/dsns/{DSN}/properties/ALRT_PAUSE_CMD/datapoints.json",
         f"/dsns/{DSN}/properties/SETTINGS_CMD/datapoints.json",
         f"/dsns/{DSN}/properties/APP_ACTIVE/datapoints.json/../BASE_STATION_ON_CMD",
+        f"/dsns/{DSN}/properties/SETTINGS_CMD/datapoints.json#/properties/APP_ACTIVE/datapoints.json",
+        f"/dsns/{DSN}/properties/SETTINGS_CMD/datapoints.json?x=/properties/APP_ACTIVE/datapoints.json",
     ],
 )
 async def test_only_app_active_can_be_written(
@@ -349,6 +350,46 @@ async def test_only_app_active_can_be_written(
     with pytest.raises(OwletReadOnlyError):
         await authed_api._request("POST", url, {"datapoint": {"value": "{}"}})
     assert not mock_api.requests
+
+
+BASE_COMMAND_URL = f"/dsns/{DSN}/properties/BASE_STATION_ON_CMD/datapoints.json"
+
+
+async def test_base_station_command_refused_by_default(
+    mock_api: FakeSession, authed_api: OwletAPI
+) -> None:
+    """Without the opt-in the base station command is never sent."""
+    with pytest.raises(OwletReadOnlyError):
+        await authed_api.post_command(DSN, "BASE_STATION_ON_CMD", {})
+    assert not mock_api.requests
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"/dsns/{DSN}/properties/ALRT_PAUSE_CMD/datapoints.json",
+        f"/dsns/{DSN}/properties/SETTINGS_CMD/datapoints.json",
+        f"/dsns/{DSN}/properties/APP_ACTIVE/datapoints.json/../BASE_STATION_ON_CMD",
+        f"/dsns/{DSN}/properties/SETTINGS_CMD/datapoints.json#/properties/APP_ACTIVE/datapoints.json",
+        f"/dsns/{DSN}/properties/SETTINGS_CMD/datapoints.json?x=/properties/APP_ACTIVE/datapoints.json",
+    ],
+)
+async def test_allow_control_only_adds_base_station_command(
+    mock_api: FakeSession, control_api: OwletAPI, url: str
+) -> None:
+    """The opt-in unlocks BASE_STATION_ON_CMD and nothing else."""
+    with pytest.raises(OwletReadOnlyError):
+        await control_api._request("POST", url, {})
+    assert not mock_api.requests
+
+
+async def test_base_station_command_sent_with_allow_control(
+    mock_api: FakeSession, control_api: OwletAPI
+) -> None:
+    mock_api.post(f"{BASE}{BASE_COMMAND_URL}", payload={"datapoint": {}})
+
+    assert await control_api.post_command(DSN, "BASE_STATION_ON_CMD", {"a": 1})
+    assert _count(mock_api, "POST", f"{BASE}{BASE_COMMAND_URL}") == 1
 
 
 async def test_activate_writes_app_active(

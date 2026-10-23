@@ -92,10 +92,15 @@ def mock_owlet_api(properties_fixture: str) -> Generator[dict[str, AsyncMock]]:
             new_callable=AsyncMock,
             side_effect=lambda *_: load_json(properties_fixture),
         ) as get_properties,
+        patch(
+            "custom_components.owlet.owletapi.api.OwletAPI.post_command",
+            new_callable=AsyncMock,
+        ) as post_command,
     ):
         yield {
             "authenticate": authenticate,
             "validate_authentication": validate,
             "get_devices": get_devices,
             "get_properties": get_properties,
+            "post_command": post_command,
         }

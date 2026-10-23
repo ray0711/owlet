@@ -50,12 +50,14 @@
         "data": {
           "scan_interval": "Polling-interval (seconden)",
           "stale_threshold": "Drempel verouderde gegevens (minuten)",
-          "activation_interval": "Activeringsinterval (seconden)"
+          "activation_interval": "Activeringsinterval (seconden)",
+          "allow_control": "Bediening basisstation toestaan"
         },
         "data_description": {
           "scan_interval": "Aantal seconden tussen twee aanvragen bij de Owlet-cloud, minimum 5. Elke poll kost meerdere API-calls per sok, een lagere waarde verhoogt het risico op rate limiting.",
           "stale_threshold": "Als de Owlet-cloud zo veel minuten geen nieuwe meting heeft, worden de vitale waarden onbeschikbaar en gaat de sensor Verouderde gegevens aan. Zet op 0 om uit te schakelen.",
-          "activation_interval": "Langste tijd tussen twee keer schrijven van APP_ACTIVE, het signaal dat het basisstation vertelt dat er een client meekijkt zodat het vitale waarden blijft uploaden. Het basisstation uploadt ongeveer 45 seconden na elke keer schrijven en meldt daarna dat het gestopt is; de integratie schrijft dan meteen opnieuw, dus deze waarde is alleen een bovengrens. Tussen 10 en 600."
+          "activation_interval": "Langste tijd tussen twee keer schrijven van APP_ACTIVE, het signaal dat het basisstation vertelt dat er een client meekijkt zodat het vitale waarden blijft uploaden. Het basisstation uploadt ongeveer 45 seconden na elke keer schrijven en meldt daarna dat het gestopt is; de integratie schrijft dan meteen opnieuw, dus deze waarde is alleen een bovengrens. Tussen 10 en 600.",
+          "allow_control": "Laat Home Assistant het basisstation aan- en uitzetten; de sensor Basisstation aan wordt dan een schakelaar. Standaard uit: de integratie schrijft dan alleen APP_ACTIVE en kan de bewaking nooit stoppen, ook niet via een automatisering, een dashboardknop of een spraakassistent."
         }
       }
     }
@@ -183,12 +185,22 @@
       "battery_status": {
         "name": "Batterijstatus"
       }
+    },
+    "switch": {
+      "base_on": {
+        "name": "Basisstation aan"
+      }
     }
   },
   "issues": {
     "stale_data": {
       "title": "Owlet-gegevens zijn al lang niet meer bijgewerkt",
       "description": "{name} heeft sinds {last_reading} geen nieuwe meting meer naar de Owlet-cloud gestuurd, terwijl de sok niet oplaadt en het basisstation aan staat.\n\nControleer of het basisstation stroom en wifi heeft en of de Owlet-app live gegevens toont. Deze melding verdwijnt vanzelf zodra er nieuwe metingen binnenkomen."
+    }
+  },
+  "exceptions": {
+    "command_failed": {
+      "message": "Het commando naar de Owlet-cloud versturen is mislukt"
     }
   }
 }
