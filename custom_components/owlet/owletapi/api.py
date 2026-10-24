@@ -648,6 +648,25 @@ class OwletAPI:
         else:
             raise OwletError("Unexpected response type from request.")
 
+    async def get_device_status(self, dsn: str) -> dict[str, str | None] | None:
+        """Return the connection fields of one device, None when it is not listed.
+
+        Reads the device list only and not the properties, so it costs a single
+        request. The cloud marks a base station that stopped reporting as
+        offline, which the properties alone do not show.
+        """
+        api_response = await self._request("GET", "/devices.json")
+        if not isinstance(api_response, list):
+            raise OwletError("Unexpected response type from request.")
+        for item in api_response:
+            device = item.get("device") if isinstance(item, dict) else None
+            if isinstance(device, dict) and device.get("dsn") == dsn:
+                return {
+                    key: device.get(key)
+                    for key in ("connection_status", "connected_at")
+                }
+        return None
+
     async def activate(self, device_serial: str) -> None:
         """Sets APP_ACTIVE on the Owlet API to 1 to return properties.
 

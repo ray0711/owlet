@@ -96,6 +96,14 @@ def mock_owlet_api(properties_fixture: str) -> Generator[dict[str, AsyncMock]]:
             "custom_components.owlet.owletapi.api.OwletAPI.post_command",
             new_callable=AsyncMock,
         ) as post_command,
+        patch(
+            "custom_components.owlet.owletapi.api.OwletAPI.get_device_status",
+            new_callable=AsyncMock,
+            return_value={
+                "connection_status": "Online",
+                "connected_at": "2023-05-23T01:21:29Z",
+            },
+        ) as get_device_status,
     ):
         yield {
             "authenticate": authenticate,
@@ -103,4 +111,5 @@ def mock_owlet_api(properties_fixture: str) -> Generator[dict[str, AsyncMock]]:
             "get_devices": get_devices,
             "get_properties": get_properties,
             "post_command": post_command,
+            "get_device_status": get_device_status,
         }

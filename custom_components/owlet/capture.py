@@ -126,6 +126,9 @@ class RawCapture:
         self.index = index
         self._last_stable: dict[str, Any] | None = None
         self._last_logged: datetime | None = None
+        # Last known online state of the base station, kept between the polls
+        # that do not ask the cloud for it.
+        self._device: dict[str, Any] | None = None
 
     def start(self) -> None:
         """Start capturing, which lets the capture lines through."""
@@ -137,13 +140,26 @@ class RawCapture:
         _ACTIVE.discard(self)
         _update_logger_level()
 
-    def record(self, raw_properties: dict[str, Any] | None, now: datetime) -> bool:
-        """Log a snapshot when due and return whether one was written."""
+    def record(
+        self,
+        raw_properties: dict[str, Any] | None,
+        now: datetime,
+        device: dict[str, Any] | None = None,
+    ) -> bool:
+        """Log a snapshot when due and return whether one was written.
+
+        The device is the connection state of the base station, None on a poll
+        that did not ask for it, then the last known state is used.
+        """
+        if device is not None:
+            self._device = device
         described = {
             name: describe_property(name, prop)
             for name, prop in (raw_properties or {}).items()
         }
         stable = {name: _stable(name, prop) for name, prop in described.items()}
+        for key, value in (self._device or {}).items():
+            stable[f"@{key}"] = value
 
         if self._last_stable is None or self._last_logged is None:
             reason = "start"
@@ -167,6 +183,7 @@ class RawCapture:
             "reason": reason,
             "changed": changed,
             "polled_at": now.isoformat(),
+            "device": self._device,
             "properties": {
                 name: _readable(name, prop) for name, prop in sorted(described.items())
             },
