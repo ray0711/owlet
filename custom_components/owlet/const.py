@@ -71,7 +71,6 @@ MAX_FUTURE_SKEW: Final = timedelta(seconds=60)
 BACKOFF_MAX: Final = timedelta(minutes=5)
 
 MANUFACTURER: Final = "Owlet Baby Care"
-SLEEP_STATES: Final = {0: "unknown", 1: "awake", 8: "light_sleep", 15: "deep_sleep"}
 
 # Raw Ayla properties whose data_updated_at reflects a fresh vitals reading.
 FRESHNESS_PROPERTIES: Final = (

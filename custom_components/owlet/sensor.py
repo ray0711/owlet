@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -13,7 +15,6 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import (
     PERCENTAGE,
-    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
     EntityCategory,
     UnitOfTemperature,
     UnitOfTime,
@@ -23,9 +24,20 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
 
 from . import OwletConfigEntry
-from .const import SLEEP_STATES
 from .coordinator import OwletCoordinator
 from .entity import OwletBaseEntity
+from .owletapi.states import (
+    BASE_BATTERY_OPTIONS,
+    BASE_STATE_OPTIONS,
+    BODY_POSITION_OPTIONS,
+    READING_FLAG_OPTIONS,
+    SLEEP_OPTIONS,
+    decode_base_battery,
+    decode_base_state,
+    decode_body_position,
+    decode_reading_flag,
+    decode_sleep_code,
+)
 
 PARALLEL_UPDATES = 0
 
@@ -35,6 +47,53 @@ class OwletSensorEntityDescription(SensorEntityDescription):
     """Represent the owlet sensor entity description."""
 
     available_during_charging: bool
+    needs_worn_sock: bool = False
+
+
+@dataclass(frozen=True, kw_only=True)
+class OwletDerivedSensorDescription(SensorEntityDescription):
+    """Describe a sensor derived from one property or the coordinator."""
+
+    source_key: str
+    value_fn: Callable[[OwletCoordinator], StateType | datetime]
+    available_during_charging: bool
+    needs_worn_sock: bool = False
+    attributes_fn: Callable[[OwletCoordinator], dict[str, Any]] | None = None
+    always_available: bool = False
+
+
+def _property(coordinator: OwletCoordinator, key: str) -> Any:
+    """Return a property of the sock, None when absent."""
+    return coordinator.sock.properties.get(key)
+
+
+def _base_code(coordinator: OwletCoordinator) -> int | None:
+    """Return the base monitoring status without its monitoring bit."""
+    raw = _property(coordinator, "base_monitoring_status")
+    return None if raw is None else raw & ~1
+
+
+def _base_state_attributes(coordinator: OwletCoordinator) -> dict[str, Any]:
+    """Return the raw base status split into its monitoring bit and code."""
+    raw = _property(coordinator, "base_monitoring_status")
+    if raw is None:
+        return {}
+    return {"raw": raw, "monitoring": bool(raw & 1), "code": raw & ~1}
+
+
+def _raw_attribute(key: str) -> Callable[[OwletCoordinator], dict[str, Any]]:
+    """Return a function that gives the raw property as the attribute raw."""
+
+    def attributes(coordinator: OwletCoordinator) -> dict[str, Any]:
+        return {"raw": _property(coordinator, key)}
+
+    return attributes
+
+
+def _session_started(coordinator: OwletCoordinator) -> datetime | None:
+    """Return when the monitoring session started, None for 0 or absent."""
+    started = _property(coordinator, "monitoring_start_time")
+    return datetime.fromtimestamp(started, UTC) if started else None
 
 
 SENSORS: tuple[OwletSensorEntityDescription, ...] = (
@@ -52,6 +111,7 @@ SENSORS: tuple[OwletSensorEntityDescription, ...] = (
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         available_during_charging=False,
+        needs_worn_sock=True,
     ),
     OwletSensorEntityDescription(
         key="heart_rate",
@@ -59,6 +119,7 @@ SENSORS: tuple[OwletSensorEntityDescription, ...] = (
         native_unit_of_measurement="bpm",
         state_class=SensorStateClass.MEASUREMENT,
         available_during_charging=False,
+        needs_worn_sock=True,
     ),
     OwletSensorEntityDescription(
         key="battery_minutes",
@@ -71,8 +132,6 @@ SENSORS: tuple[OwletSensorEntityDescription, ...] = (
     OwletSensorEntityDescription(
         key="signal_strength",
         translation_key="signalstrength",
-        native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         available_during_charging=True,
@@ -84,6 +143,7 @@ SENSORS: tuple[OwletSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         available_during_charging=False,
+        needs_worn_sock=True,
     ),
     OwletSensorEntityDescription(
         key="movement",
@@ -91,6 +151,7 @@ SENSORS: tuple[OwletSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_registry_enabled_default=False,
         available_during_charging=False,
+        needs_worn_sock=True,
     ),
     OwletSensorEntityDescription(
         key="movement_bucket",
@@ -98,6 +159,7 @@ SENSORS: tuple[OwletSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_registry_enabled_default=False,
         available_during_charging=False,
+        needs_worn_sock=True,
     ),
     # Raw status codes from the device, useful when checking what the sock
     # reports during an alert. Their meaning is not documented by Owlet.
@@ -121,6 +183,67 @@ SENSORS: tuple[OwletSensorEntityDescription, ...] = (
     ),
 )
 
+DERIVED_SENSORS: tuple[OwletDerivedSensorDescription, ...] = (
+    OwletDerivedSensorDescription(
+        key="base_state",
+        translation_key="base_state",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(BASE_STATE_OPTIONS),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        source_key="base_monitoring_status",
+        value_fn=lambda coordinator: decode_base_state(_base_code(coordinator)),
+        attributes_fn=_base_state_attributes,
+        available_during_charging=True,
+    ),
+    OwletDerivedSensorDescription(
+        key="base_battery",
+        translation_key="base_battery",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(BASE_BATTERY_OPTIONS),
+        source_key="base_battery_status",
+        value_fn=lambda coordinator: decode_base_battery(
+            _property(coordinator, "base_battery_status")
+        ),
+        available_during_charging=True,
+    ),
+    OwletDerivedSensorDescription(
+        key="session_started",
+        translation_key="session_started",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        source_key="monitoring_start_time",
+        value_fn=_session_started,
+        available_during_charging=True,
+    ),
+    OwletDerivedSensorDescription(
+        key="body_position",
+        translation_key="body_position",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(BODY_POSITION_OPTIONS),
+        source_key="body_position",
+        value_fn=lambda coordinator: decode_body_position(
+            _property(coordinator, "body_position")
+        ),
+        attributes_fn=_raw_attribute("body_position"),
+        available_during_charging=False,
+        needs_worn_sock=True,
+    ),
+    OwletDerivedSensorDescription(
+        key="reading_state",
+        translation_key="reading_state",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(READING_FLAG_OPTIONS),
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        source_key="readings_flag",
+        value_fn=lambda coordinator: decode_reading_flag(
+            _property(coordinator, "readings_flag")
+        ),
+        attributes_fn=_raw_attribute("readings_flag"),
+        available_during_charging=True,
+    ),
+)
+
 RED_ALERT_SUMMARY = "RED_ALERT_SUMMARY"
 
 
@@ -138,6 +261,11 @@ async def async_setup_entry(
             OwletSensor(coordinator, description)
             for description in SENSORS
             if description.key in properties
+        )
+        sensors.extend(
+            OwletDerivedSensor(coordinator, description)
+            for description in DERIVED_SENSORS
+            if description.source_key in properties
         )
         if OwletSleepSensor.entity_description.key in properties:
             sensors.append(OwletSleepSensor(coordinator))
@@ -173,6 +301,7 @@ class OwletSensor(OwletBaseEntity, SensorEntity):
         return super().available and self.coordinator.reading_available(
             self.entity_description.key,
             self.entity_description.available_during_charging,
+            self.entity_description.needs_worn_sock,
         )
 
     @property
@@ -181,15 +310,56 @@ class OwletSensor(OwletBaseEntity, SensorEntity):
         return self.sock.properties.get(self.entity_description.key)
 
 
+class OwletDerivedSensor(OwletBaseEntity, SensorEntity):
+    """A sensor derived from a property or the coordinator."""
+
+    entity_description: OwletDerivedSensorDescription
+
+    def __init__(
+        self,
+        coordinator: OwletCoordinator,
+        description: OwletDerivedSensorDescription,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._attr_unique_id = f"{self.sock.serial}-{description.key}"
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        description = self.entity_description
+        return super().available and (
+            description.always_available
+            or self.coordinator.reading_available(
+                description.source_key,
+                description.available_during_charging,
+                description.needs_worn_sock,
+            )
+        )
+
+    @property
+    def native_value(self) -> StateType | datetime:
+        """Return sensor value."""
+        return self.entity_description.value_fn(self.coordinator)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return the extra attributes of the sensor."""
+        attributes_fn = self.entity_description.attributes_fn
+        return attributes_fn(self.coordinator) if attributes_fn else None
+
+
 class OwletSleepSensor(OwletSensor):
     """Representation of an Owlet sleep sensor."""
 
-    _attr_options = list(SLEEP_STATES.values())
+    _attr_options = list(SLEEP_OPTIONS)
     entity_description = OwletSensorEntityDescription(
         key="sleep_state",
         translation_key="sleepstate",
         device_class=SensorDeviceClass.ENUM,
         available_during_charging=False,
+        needs_worn_sock=True,
     )
 
     def __init__(
@@ -201,8 +371,8 @@ class OwletSleepSensor(OwletSensor):
 
     @property
     def native_value(self) -> StateType:
-        """Return sensor value."""
-        return SLEEP_STATES.get(self.sock.properties.get("sleep_state"), "unknown")
+        """Return the sleep band of the sock's sleep code."""
+        return decode_sleep_code(self.sock.properties.get("sleep_state")) or "unknown"
 
 
 class OwletOxygenAverageSensor(OwletSensor):
@@ -213,6 +383,7 @@ class OwletOxygenAverageSensor(OwletSensor):
         translation_key="o2saturation10a",
         native_unit_of_measurement=PERCENTAGE,
         available_during_charging=False,
+        needs_worn_sock=True,
         state_class=SensorStateClass.MEASUREMENT,
     )
 

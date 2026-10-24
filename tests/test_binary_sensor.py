@@ -122,7 +122,7 @@ async def test_awake_is_unknown_without_sleep_state(
     await setup_integration(hass, mock_config_entry)
 
     assert _state(hass, "sleep_state") == STATE_UNKNOWN
-    assert state(hass, "sensor", "sleep_state").state == "unknown"
+    assert state(hass, "sensor", "sleep_state").state == "no_data"
 
 
 async def test_no_switch_entities(
