@@ -8,7 +8,8 @@ from unittest.mock import AsyncMock
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.owlet.const import DOMAIN
+from custom_components.owlet.const import CONF_STALE_THRESHOLD, DOMAIN
+from custom_components.owlet.sensor import OwletDerivedSensor
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -401,3 +402,195 @@ async def test_sleep_state_bands(
     await setup_integration(hass, mock_config_entry)
 
     assert _state(hass, "sleep_state") == expected
+
+
+def _patch_mobile_vitals(
+    mock_owlet_api: dict[str, AsyncMock],
+    fixture: str,
+    sh: str | None = None,
+    updated: str | object | None = ...,
+) -> None:
+    """Make get_properties return a fixture with a patched sleep string or time."""
+    data = load_json(fixture)
+    mobile = data["response"]["MOBILE_VITALS"]
+    if sh is not None:
+        mobile["value"] = json.dumps({"sh": sh})
+    if updated is None:
+        del mobile["data_updated_at"]
+    elif updated is not ...:
+        mobile["data_updated_at"] = updated
+    mock_owlet_api["get_properties"].side_effect = lambda *_: data
+
+
+def _use_threshold(hass: HomeAssistant, entry: MockConfigEntry, seconds: int) -> None:
+    """Set the staleness threshold (the shared entry uses 300 s)."""
+    entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, CONF_STALE_THRESHOLD: seconds}
+    )
+
+
+@pytest.mark.parametrize(
+    ("sh", "expected"),
+    [(None, "8"), ("F88", "15"), ("", STATE_UNKNOWN), ("G", STATE_UNKNOWN)],
+)
+async def test_sleep_code_minute(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer,
+    *,
+    sh: str | None,
+    expected: str,
+) -> None:
+    """The newest character of the sleep string is the numeric code."""
+    freezer.move_to(ON_FOOT)
+    _patch_mobile_vitals(mock_owlet_api, "live_on_foot.json", sh)
+    await setup_integration(hass, mock_config_entry)
+
+    result = state(hass, "sensor", "sleep_code_minute")
+    assert result.state == expected
+    assert result.attributes["state_class"] == "measurement"
+    assert "unit_of_measurement" not in result.attributes
+    assert "device_class" not in result.attributes
+
+
+@pytest.mark.parametrize(
+    ("sh", "expected"),
+    [("F88", "deep_sleep"), ("", STATE_UNKNOWN), ("G", STATE_UNKNOWN)],
+)
+async def test_sleep_state_minute_unreadable(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer,
+    *,
+    sh: str,
+    expected: str,
+) -> None:
+    """An empty or malformed string gives unknown, not an error."""
+    freezer.move_to(ON_FOOT)
+    _patch_mobile_vitals(mock_owlet_api, "live_on_foot.json", sh)
+    await setup_integration(hass, mock_config_entry)
+
+    assert _state(hass, "sleep_state_minute") == expected
+
+
+async def test_sleep_state_minute_and_history(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer,
+) -> None:
+    """The state is the newest minute, the history lists every minute."""
+    freezer.move_to(ON_FOOT)
+    _patch_mobile_vitals(
+        mock_owlet_api, "live_on_foot.json", "188", "2026-10-24T14:28:03Z"
+    )
+    await setup_integration(hass, mock_config_entry)
+
+    result = state(hass, "sensor", "sleep_state_minute")
+    assert result.state == "awake"
+    assert result.attributes["history"] == [
+        {"time": "2026-10-24T14:28:03+00:00", "state": "awake", "raw": 1},
+        {"time": "2026-10-24T14:27:03+00:00", "state": "light_sleep", "raw": 8},
+        {"time": "2026-10-24T14:26:03+00:00", "state": "light_sleep", "raw": 8},
+    ]
+    assert result.attributes["updated"] == "2026-10-24T14:28:03+00:00"
+
+
+async def test_sleep_sensors_available_while_charging(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer,
+) -> None:
+    """The sleep sensors still show the base's code while the sock charges."""
+    freezer.move_to("2026-10-24T15:36:47+00:00")
+    mock_owlet_api["get_properties"].side_effect = lambda *_: load_json(
+        "live_on_station.json"
+    )
+    await setup_integration(hass, mock_config_entry)
+
+    assert _state(hass, "sleep_state_minute") == STATE_UNKNOWN
+    assert _state(hass, "sleep_code_minute") == STATE_UNKNOWN
+
+
+async def test_sleep_sensors_stay_available_between_mobile_vitals_updates(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer,
+) -> None:
+    """Freshness follows the real-time vitals, not the once-a-minute string."""
+    freezer.move_to(ON_FOOT)
+    _use_threshold(hass, mock_config_entry, 20)
+    _patch_mobile_vitals(
+        mock_owlet_api, "live_on_foot.json", updated="2026-10-24T14:22:11Z"
+    )
+    await setup_integration(hass, mock_config_entry)
+
+    assert _state(hass, "sleep_state_minute") == "light_sleep"
+    assert _state(hass, "sleep_code_minute") == "8"
+
+
+async def test_sleep_sensors_unavailable_when_vitals_stale(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer,
+) -> None:
+    """Stale real-time vitals hide the sleep sensors, a fresh string or not."""
+    freezer.move_to("2026-10-24T14:23:40+00:00")
+    _use_threshold(hass, mock_config_entry, 20)
+    _patch_mobile_vitals(
+        mock_owlet_api, "live_on_foot.json", updated="2026-10-24T14:23:38Z"
+    )
+    await setup_integration(hass, mock_config_entry)
+
+    assert _state(hass, "sleep_state_minute") == STATE_UNAVAILABLE
+    assert _state(hass, "sleep_code_minute") == STATE_UNAVAILABLE
+
+
+@pytest.mark.parametrize("updated", [None, "2026-10-24T14:28:03"])
+async def test_history_with_bad_mobile_vitals_timestamp(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer,
+    *,
+    updated: str | None,
+) -> None:
+    """Without a usable time the state decodes but no history is invented."""
+    freezer.move_to(ON_FOOT)
+    _patch_mobile_vitals(mock_owlet_api, "live_on_foot.json", "F88", updated)
+    await setup_integration(hass, mock_config_entry)
+
+    result = state(hass, "sensor", "sleep_state_minute")
+    assert result.state == "deep_sleep"
+    assert result.attributes["history"] == []
+    assert result.attributes["updated"] is None
+    assert _state(hass, "sleep_code_minute") == "15"
+
+
+async def test_sleep_sensors_not_created_without_mobile_vitals(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer,
+) -> None:
+    """A sock without MOBILE_VITALS gets no per-minute sleep sensors."""
+    freezer.move_to(ON_FOOT)
+    data = load_json("live_on_foot.json")
+    del data["response"]["MOBILE_VITALS"]
+    mock_owlet_api["get_properties"].side_effect = lambda *_: data
+    await setup_integration(hass, mock_config_entry)
+
+    registry = er.async_get(hass)
+    for key in ("sleep_code_minute", "sleep_state_minute"):
+        assert registry.async_get_entity_id("sensor", DOMAIN, f"{SERIAL}-{key}") is None
+
+
+def test_history_not_recorded() -> None:
+    """The history changes every minute and is kept out of the recorder."""
+    assert "history" in OwletDerivedSensor._unrecorded_attributes

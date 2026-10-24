@@ -37,9 +37,12 @@ from .owletapi.states import (
     decode_body_position,
     decode_reading_flag,
     decode_sleep_code,
+    sleep_history,
 )
 
 PARALLEL_UPDATES = 0
+
+MOBILE_VITALS = "MOBILE_VITALS"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -88,6 +91,34 @@ def _session_started(coordinator: OwletCoordinator) -> datetime | None:
     """Return when the monitoring session started, None for 0 or absent."""
     started = _property(coordinator, "monitoring_start_time")
     return datetime.fromtimestamp(started, UTC) if started else None
+
+
+def _minute_code(coordinator: OwletCoordinator) -> int | None:
+    """Return the newest per-minute sleep code, None when absent or unreadable."""
+    codes = coordinator.sock.sleep_codes
+    return codes[0] if codes else None
+
+
+def _minute_state(coordinator: OwletCoordinator) -> str | None:
+    """Return the band name of the newest per-minute sleep code."""
+    return decode_sleep_code(_minute_code(coordinator))
+
+
+def _minute_attributes(coordinator: OwletCoordinator) -> dict[str, Any]:
+    """Return the per-minute history and the cloud time it hangs on.
+
+    Without a usable cloud time the history stays empty rather than guessed.
+    """
+    updated = coordinator.sock.sleep_updated_at
+    codes = coordinator.sock.sleep_codes
+    history = sleep_history(codes, updated) if updated is not None else []
+    return {
+        "history": [
+            {"time": point.time.isoformat(), "state": point.state, "raw": point.raw}
+            for point in history
+        ],
+        "updated": updated.isoformat() if updated is not None else None,
+    }
 
 
 SENSORS: tuple[OwletSensorEntityDescription, ...] = (
@@ -238,6 +269,24 @@ DERIVED_SENSORS: tuple[OwletDerivedSensorDescription, ...] = (
         attributes_fn=_raw_attribute("readings_flag"),
         available_during_charging=True,
     ),
+    OwletDerivedSensorDescription(
+        key="sleep_code_minute",
+        translation_key="sleep_code_minute",
+        state_class=SensorStateClass.MEASUREMENT,
+        source_key=MOBILE_VITALS,
+        value_fn=_minute_code,
+        available_during_charging=True,
+    ),
+    OwletDerivedSensorDescription(
+        key="sleep_state_minute",
+        translation_key="sleep_state_minute",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(SLEEP_OPTIONS),
+        source_key=MOBILE_VITALS,
+        value_fn=_minute_state,
+        attributes_fn=_minute_attributes,
+        available_during_charging=True,
+    ),
 )
 
 RED_ALERT_SUMMARY = "RED_ALERT_SUMMARY"
@@ -262,6 +311,7 @@ async def async_setup_entry(
             OwletDerivedSensor(coordinator, description)
             for description in DERIVED_SENSORS
             if description.source_key in properties
+            or description.source_key in (coordinator.sock.raw_properties or {})
         )
         if OwletSleepSensor.entity_description.key in properties:
             sensors.append(OwletSleepSensor(coordinator))
@@ -310,6 +360,8 @@ class OwletDerivedSensor(OwletBaseEntity, SensorEntity):
     """A sensor derived from a property or the coordinator."""
 
     entity_description: OwletDerivedSensorDescription
+    # The per-minute history changes every minute and would be stored in full.
+    _unrecorded_attributes = frozenset({"history"})
 
     def __init__(
         self,
