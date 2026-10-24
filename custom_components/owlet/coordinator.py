@@ -20,6 +20,7 @@ from homeassistant.util import dt as dt_util
 from .capture import RawCapture
 from .const import (
     BACKOFF_MAX,
+    CAPTURE_DEVICE_INTERVAL,
     CONF_CAPTURE_RAW,
     CONF_STALE_THRESHOLD,
     DEFAULT_CAPTURE_RAW,
@@ -105,6 +106,7 @@ class OwletCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._readings_expected: bool | None = None
         self._expiry_unsub: CALLBACK_TYPE | None = None
         self._capture: RawCapture | None = None
+        self._device_checked: datetime | None = None
         if bool(entry.options.get(CONF_CAPTURE_RAW, DEFAULT_CAPTURE_RAW)):
             self._capture = RawCapture(index)
             self._capture.start()
@@ -144,13 +146,13 @@ class OwletCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.config_entry, data={**self.config_entry.data, **tokens}
             )
 
-        self._record_capture()
+        await self._async_record_capture()
         self._remember_expectation()
         self._schedule_expiry()
         self._async_update_stale_issue()
         return self.sock.properties
 
-    def _record_capture(self) -> None:
+    async def _async_record_capture(self) -> None:
         """Log the raw properties when the capture is on.
 
         A debugging aid must never be able to break polling, so a failure turns
@@ -159,11 +161,27 @@ class OwletCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._capture is None:
             return
         try:
-            self._capture.record(self.sock.raw_properties, dt_util.utcnow())
+            now = dt_util.utcnow()
+            device = None
+            if (
+                self._device_checked is None
+                or now - self._device_checked >= CAPTURE_DEVICE_INTERVAL
+            ):
+                self._device_checked = now
+                device = await self._async_device_status()
+            self._capture.record(self.sock.raw_properties, now, device)
         except Exception:
             _LOGGER.warning("Raw data capture failed and is turned off", exc_info=True)
             self._capture.stop()
             self._capture = None
+
+    async def _async_device_status(self) -> dict[str, str | None] | None:
+        """Ask the cloud whether the base station is online, None if it cannot."""
+        try:
+            return await self.sock.api.get_device_status(self.sock.serial)
+        except (OwletError, ClientError, TimeoutError) as err:
+            _LOGGER.debug("Could not read the base station state: %s", err)
+            return None
 
     def _next_retry(self, minimum: float | None = None) -> float:
         """Return how long to wait before the next poll after a failure.

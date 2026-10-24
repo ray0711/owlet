@@ -18,6 +18,7 @@ from custom_components.owlet.owletapi.exceptions import (
     OwletCredentialsError,
     OwletDevicesError,
     OwletEmailError,
+    OwletError,
     OwletPasswordError,
     OwletRateLimitError,
     OwletReadOnlyError,
@@ -273,6 +274,50 @@ async def test_get_devices_filters_versions(
 
     with pytest.raises(OwletDevicesError):
         await authed_api.get_devices([2])
+
+
+async def test_get_device_status_reads_only_the_connection_fields(
+    mock_api: FakeSession, authed_api: OwletAPI
+) -> None:
+    """One request to the device list, nothing identifying is returned."""
+    mock_api.get(
+        f"{BASE}/devices.json",
+        payload=[
+            {"device": {"dsn": "OTHER", "connection_status": "Offline"}},
+            {
+                "device": {
+                    "dsn": DSN,
+                    "connection_status": "Online",
+                    "connected_at": "2026-10-24T15:18:03Z",
+                    "mac": "D0ECE231F766",
+                    "lan_ip": "192.0.2.10",
+                }
+            },
+        ],
+    )
+
+    status = await authed_api.get_device_status(DSN)
+
+    assert status == {
+        "connection_status": "Online",
+        "connected_at": "2026-10-24T15:18:03Z",
+    }
+    assert _count(mock_api, "GET", f"{BASE}/devices.json") == 1
+
+
+async def test_get_device_status_unknown_device(
+    mock_api: FakeSession, authed_api: OwletAPI
+) -> None:
+    mock_api.get(f"{BASE}/devices.json", payload=[{"device": {"dsn": "OTHER"}}])
+    assert await authed_api.get_device_status(DSN) is None
+
+
+async def test_get_device_status_rejects_an_unexpected_reply(
+    mock_api: FakeSession, authed_api: OwletAPI
+) -> None:
+    mock_api.get(f"{BASE}/devices.json", payload={"error": "nope"})
+    with pytest.raises(OwletError):
+        await authed_api.get_device_status(DSN)
 
 
 async def test_get_devices_reports_refreshed_tokens(

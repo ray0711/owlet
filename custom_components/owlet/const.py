@@ -18,6 +18,10 @@ CONF_CAPTURE_RAW: Final = "capture_raw"
 # log, to learn what the base station and sock report. Off by default.
 DEFAULT_CAPTURE_RAW: Final = False
 
+# While capturing, how often the cloud is asked whether the base station is
+# online. One extra request per sock, only with the capture on.
+CAPTURE_DEVICE_INTERVAL: Final = timedelta(seconds=30)
+
 # Opt-in: lets Home Assistant switch the base station on and off. Off by default,
 # then the client refuses every write except APP_ACTIVE.
 DEFAULT_ALLOW_CONTROL: Final = False

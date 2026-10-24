@@ -8,8 +8,12 @@ import logging
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
+from freezegun.api import FrozenDateTimeFactory
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 
 from custom_components.owlet.capture import (
     _ACTIVE,
@@ -19,6 +23,7 @@ from custom_components.owlet.capture import (
     describe_property,
 )
 from custom_components.owlet.const import CONF_CAPTURE_RAW, DOMAIN
+from custom_components.owlet.owletapi.exceptions import OwletConnectionError
 from homeassistant.components.diagnostics import REDACTED
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -148,6 +153,45 @@ def test_a_changed_vitals_status_key_is_logged(
 
     assert capture.record(raw(vitals(ss=15)), START) is True
     assert lines(caplog)[1]["changed"] == ["REAL_TIME_VITALS"]
+
+
+ONLINE = {"connection_status": "Online", "connected_at": "2026-10-24T15:18:03Z"}
+
+
+def test_the_base_station_state_is_logged(caplog: pytest.LogCaptureFixture) -> None:
+    """The online state of the base is part of the snapshot, nothing else of the device."""
+    RawCapture(0).record(raw(), START, ONLINE)
+
+    assert lines(caplog)[0]["device"] == ONLINE
+
+
+def test_the_last_known_state_is_kept_between_checks(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A poll that did not ask the cloud neither forgets the state nor logs a change."""
+    capture = RawCapture(0)
+    capture.record(raw(), START, ONLINE)
+
+    assert capture.record(raw(), START, None) is False
+    assert capture.record(raw(), START + HEARTBEAT, None) is True
+    assert lines(caplog)[1]["device"] == ONLINE
+
+
+def test_going_offline_and_coming_back_is_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A base that stops reporting shows up as offline, a reconnect as a new time."""
+    capture = RawCapture(0)
+    capture.record(raw(), START, ONLINE)
+
+    offline = {**ONLINE, "connection_status": "Offline"}
+    assert capture.record(raw(), START, offline) is True
+    back = {"connection_status": "Online", "connected_at": "2026-10-24T15:25:30Z"}
+    assert capture.record(raw(), START, back) is True
+
+    assert lines(caplog)[1]["changed"] == ["@connection_status"]
+    assert lines(caplog)[2]["changed"] == ["@connected_at", "@connection_status"]
+    assert lines(caplog)[2]["device"] == back
 
 
 def test_a_new_property_is_logged(caplog: pytest.LogCaptureFixture) -> None:
@@ -353,3 +397,58 @@ async def test_a_failing_capture_never_breaks_polling(
     assert "SERIAL_NUMBER" not in caplog.text
     # The capture turned itself off.
     assert logging.getLogger(CAPTURE_LOGGER_NAME).level == logging.NOTSET
+
+
+@pytest.mark.freeze_time(FRESH_TIME)
+async def test_the_base_station_state_is_asked_for_every_thirty_seconds(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+    freezer: FrozenDateTimeFactory,
+    capture_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """One extra request per half minute, not one per poll."""
+    await setup_integration(hass, capture_entry)
+    calls = mock_owlet_api["get_device_status"]
+    assert calls.await_count == 1
+    assert lines(caplog)[0]["device"]["connection_status"] == "Online"
+
+    for _ in range(2):  # 10 s polls
+        freezer.tick(timedelta(seconds=10))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+    assert calls.await_count == 1
+
+    freezer.tick(timedelta(seconds=15))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert calls.await_count == 2
+
+
+@pytest.mark.freeze_time(FRESH_TIME)
+async def test_the_state_is_not_asked_for_without_the_capture(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """Nothing extra is requested from the cloud unless the option is on."""
+    await setup_integration(hass, mock_config_entry)
+
+    mock_owlet_api["get_device_status"].assert_not_awaited()
+
+
+@pytest.mark.freeze_time(FRESH_TIME)
+async def test_a_failing_state_request_does_not_break_the_capture(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+    capture_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """If the cloud cannot tell, the snapshot is logged without the state."""
+    mock_owlet_api["get_device_status"].side_effect = OwletConnectionError("down")
+    await setup_integration(hass, capture_entry)
+
+    assert capture_entry.state is ConfigEntryState.LOADED
+    (snapshot,) = lines(caplog)
+    assert snapshot["device"] is None
+    assert "Raw data capture failed" not in caplog.text
