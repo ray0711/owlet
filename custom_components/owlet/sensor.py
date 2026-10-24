@@ -67,12 +67,6 @@ def _property(coordinator: OwletCoordinator, key: str) -> Any:
     return coordinator.sock.properties.get(key)
 
 
-def _base_code(coordinator: OwletCoordinator) -> int | None:
-    """Return the base monitoring status without its monitoring bit."""
-    raw = _property(coordinator, "base_monitoring_status")
-    return None if raw is None else raw & ~1
-
-
 def _base_state_attributes(coordinator: OwletCoordinator) -> dict[str, Any]:
     """Return the raw base status split into its monitoring bit and code."""
     raw = _property(coordinator, "base_monitoring_status")
@@ -192,7 +186,9 @@ DERIVED_SENSORS: tuple[OwletDerivedSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         source_key="base_monitoring_status",
-        value_fn=lambda coordinator: decode_base_state(_base_code(coordinator)),
+        value_fn=lambda coordinator: decode_base_state(
+            _property(coordinator, "base_monitoring_status")
+        ),
         attributes_fn=_base_state_attributes,
         available_during_charging=True,
     ),

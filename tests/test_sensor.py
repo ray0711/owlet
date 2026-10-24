@@ -151,7 +151,11 @@ async def test_sensors_v2(
 
 @pytest.mark.parametrize(
     ("bms", "expected", "monitoring", "code"),
-    [(8, "on_station", False, 8), (65, "unknown", True, 64)],
+    [
+        (8, "on_station", False, 8),
+        (9, "unknown", True, 8),
+        (65, "unknown", True, 64),
+    ],
 )
 async def test_base_state(
     hass: HomeAssistant,
