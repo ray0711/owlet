@@ -32,6 +32,7 @@ from .owletapi.states import (
     BODY_POSITION_OPTIONS,
     READING_FLAG_OPTIONS,
     SLEEP_OPTIONS,
+    STATUS_OPTIONS,
     decode_base_battery,
     decode_base_state,
     decode_body_position,
@@ -210,6 +211,16 @@ SENSORS: tuple[OwletSensorEntityDescription, ...] = (
 
 DERIVED_SENSORS: tuple[OwletDerivedSensorDescription, ...] = (
     OwletDerivedSensorDescription(
+        key="status",
+        translation_key="status",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(STATUS_OPTIONS),
+        source_key="status",
+        value_fn=lambda coordinator: coordinator.status,
+        available_during_charging=True,
+        always_available=True,
+    ),
+    OwletDerivedSensorDescription(
         key="base_state",
         translation_key="base_state",
         device_class=SensorDeviceClass.ENUM,
@@ -292,6 +303,21 @@ DERIVED_SENSORS: tuple[OwletDerivedSensorDescription, ...] = (
 RED_ALERT_SUMMARY = "RED_ALERT_SUMMARY"
 
 
+def _is_created(
+    coordinator: OwletCoordinator, description: OwletDerivedSensorDescription
+) -> bool:
+    """Return if the sock gets this derived sensor.
+
+    The status line is computed from several properties, so it exists for
+    every Smart Sock 3 / Dream Sock instead of following one source key.
+    """
+    if description.key == "status":
+        return coordinator.sock.version == 3
+    return description.source_key in coordinator.sock.properties or (
+        description.source_key in (coordinator.sock.raw_properties or {})
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: OwletConfigEntry,
@@ -310,8 +336,7 @@ async def async_setup_entry(
         sensors.extend(
             OwletDerivedSensor(coordinator, description)
             for description in DERIVED_SENSORS
-            if description.source_key in properties
-            or description.source_key in (coordinator.sock.raw_properties or {})
+            if _is_created(coordinator, description)
         )
         if OwletSleepSensor.entity_description.key in properties:
             sensors.append(OwletSleepSensor(coordinator))

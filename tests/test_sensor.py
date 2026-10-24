@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 import json
 from unittest.mock import AsyncMock
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 
 from custom_components.owlet.const import CONF_STALE_THRESHOLD, DOMAIN
+from custom_components.owlet.owletapi.states import STATUS_OPTIONS
 from custom_components.owlet.sensor import OwletDerivedSensor
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
@@ -594,3 +599,67 @@ async def test_sleep_sensors_not_created_without_mobile_vitals(
 def test_history_not_recorded() -> None:
     """The history changes every minute and is kept out of the recorder."""
     assert "history" in OwletDerivedSensor._unrecorded_attributes
+
+
+@pytest.mark.parametrize(
+    ("properties_fixture", "time", "expected"),
+    [
+        ("live_on_foot.json", ON_FOOT, "normal"),
+        ("live_sock_off.json", SOCK_OFF, "sock_off_baby"),
+        ("live_on_station.json", "2026-10-24T15:36:47+00:00", "sock_charged"),
+        ("live_cold_boot.json", COLD_BOOT, "sock_recently_placed"),
+    ],
+)
+async def test_status_entity_values(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer,
+    *,
+    time: str,
+    expected: str,
+) -> None:
+    """The status sensor shows the status line of the coordinator."""
+    freezer.move_to(time)
+    await setup_integration(hass, mock_config_entry)
+
+    assert _state(hass, "status") == expected
+    assert state(hass, "sensor", "status").attributes["options"] == list(STATUS_OPTIONS)
+
+
+@pytest.mark.parametrize("properties_fixture", ["live_on_foot.json"])
+async def test_status_stays_available_when_stale(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer,
+) -> None:
+    """Stale vitals turn the status into trouble_getting_data, not unavailable."""
+    freezer.move_to(ON_FOOT)
+    await setup_integration(hass, mock_config_entry)
+    assert _state(hass, "status") == "normal"
+    assert _state(hass, "heart_rate") != STATE_UNAVAILABLE
+
+    freezer.tick(timedelta(minutes=5))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+    assert _state(hass, "heart_rate") == STATE_UNAVAILABLE
+    assert _state(hass, "status") == "trouble_getting_data"
+
+
+@pytest.mark.freeze_time("2023-11-20T14:06:00+00:00")
+@pytest.mark.parametrize("properties_fixture", ["update_properties_v2.json"])
+async def test_status_not_created_for_v2(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """A Smart Sock 2 gets no status sensor."""
+    await setup_integration(hass, mock_config_entry)
+
+    assert (
+        entity_registry.async_get_entity_id("sensor", DOMAIN, f"{SERIAL}-status")
+        is None
+    )
