@@ -137,8 +137,15 @@ Gauge ranges and trend graphs are for display only and have no medical meaning. 
 | Polling interval | 10 s | Seconds between requests to the Owlet cloud, minimum 5. Every poll costs several API calls per sock, a lower value raises the risk of rate limiting. |
 | Stale data threshold | 5 min | Minutes without a new reading before the data is treated as stale. Set to 0 to disable. |
 | Activation interval | 30 s | Longest time between two `APP_ACTIVE` writes (10 to 600). This flag tells the base station a client is watching, which makes it upload vitals; it is the only thing the integration ever writes. The base station uploads for about 45 seconds after each write, then sets the flag back to 0 itself; the integration writes again as soon as it sees that, so the interval is only a ceiling. |
+| Capture raw data in the log | off | Writes the raw properties the Owlet cloud reports for each sock to the Home Assistant log, see [Raw data capture](#raw-data-capture). |
 
 The integration also supports **Reconfigure** (change region or log in again) and asks you to log in again when the Owlet login really is no longer valid. Rate limits and outages never trigger that: the next poll is simply delayed.
+
+### Raw data capture
+
+Meant for finding out what the sock and base station report, for example which values a status property takes when the sock is charged or removed. Turn on **Capture raw data in the log** in the options, reproduce the situation and copy the lines containing `owlet capture` from the full log (**Settings > System > Logs > Show raw logs**, or `home-assistant.log`); the default log view only shows warnings and errors. Turn it off afterwards.
+
+Each line is `owlet capture sock<N>: {json}` from the logger `custom_components.owlet.capture` (the integration raises it to INFO while the option is on). A line is written when the capture starts, when a value other than the fast moving vitals changes (the `changed` field names it) and every 5 minutes. Each line holds all properties, so the heart rate and other fast values around a change are always there. Only properties known to be harmless are logged with their value, the others appear by name with type and timestamp. Tokens, email address, serial numbers and MAC addresses are never logged and the sock is identified by its index, which follows the order in which the Owlet cloud lists your socks. If you configured a level for `custom_components.owlet.capture` yourself through the logger integration, that level wins.
 
 ## Troubleshooting
 

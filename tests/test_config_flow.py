@@ -11,6 +11,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.owlet.const import (
     CONF_ACTIVATION_INTERVAL,
     CONF_ALLOW_CONTROL,
+    CONF_CAPTURE_RAW,
     CONF_STALE_THRESHOLD,
     DEFAULT_ACTIVATION_INTERVAL,
     DEFAULT_STALE_THRESHOLD,
@@ -259,6 +260,7 @@ async def test_options_flow(
             CONF_STALE_THRESHOLD: 0,
             CONF_ACTIVATION_INTERVAL: 120,
             CONF_ALLOW_CONTROL: True,
+            CONF_CAPTURE_RAW: True,
         },
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -267,7 +269,27 @@ async def test_options_flow(
         CONF_STALE_THRESHOLD: 0,
         CONF_ACTIVATION_INTERVAL: 120,
         CONF_ALLOW_CONTROL: True,
+        CONF_CAPTURE_RAW: True,
     }
+
+
+async def test_options_flow_capture_is_off_by_default(
+    hass: HomeAssistant, mock_login: AsyncMock, mock_config_entry: MockConfigEntry
+) -> None:
+    """The raw capture never turns on unless the user asks for it."""
+    mock_config_entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_SCAN_INTERVAL: 30,
+            CONF_STALE_THRESHOLD: 5,
+            CONF_ACTIVATION_INTERVAL: 120,
+        },
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert mock_config_entry.options[CONF_CAPTURE_RAW] is False
 
 
 async def test_options_flow_rejects_out_of_range_activation(

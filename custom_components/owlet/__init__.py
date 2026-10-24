@@ -117,9 +117,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: OwletConfigEntry) -> boo
 
     coordinators = {
         device["device"]["dsn"]: OwletCoordinator(
-            hass, entry, Sock(owlet_api, device["device"])
+            hass, entry, Sock(owlet_api, device["device"]), index
         )
-        for device in devices["response"]
+        for index, device in enumerate(devices["response"])
     }
 
     await asyncio.gather(

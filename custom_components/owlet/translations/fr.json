@@ -51,13 +51,15 @@
           "scan_interval": "Intervalle d'interrogation (secondes)",
           "stale_threshold": "Seuil de données obsolètes (minutes)",
           "activation_interval": "Intervalle d'activation (secondes)",
-          "allow_control": "Autoriser le contrôle de la station de base"
+          "allow_control": "Autoriser le contrôle de la station de base",
+          "capture_raw": "Enregistrer les données brutes dans le journal"
         },
         "data_description": {
           "scan_interval": "Secondes entre deux requêtes vers le cloud Owlet, minimum 5. Chaque interrogation coûte plusieurs appels API par chaussette, une valeur plus basse augmente le risque de limitation.",
           "stale_threshold": "Si le cloud Owlet ne reçoit aucune nouvelle mesure pendant ce nombre de minutes, les signes vitaux deviennent indisponibles et le capteur Données obsolètes s'active. Mettez 0 pour désactiver.",
           "activation_interval": "Durée maximale entre deux écritures d'APP_ACTIVE, le signal qui indique à la station de base qu'un client la regarde pour qu'elle continue d'envoyer les signes vitaux. La station de base envoie pendant environ 45 secondes après chaque écriture puis signale qu'elle s'est arrêtée ; l'intégration écrit alors de nouveau dès qu'elle le voit, cette valeur n'est donc qu'un plafond. Entre 10 et 600.",
-          "allow_control": "Permet à Home Assistant d'allumer et d'éteindre la station de base ; le capteur Station de base allumée devient alors un interrupteur. Désactivé par défaut : l'intégration n'écrit alors qu'APP_ACTIVE et ne peut jamais arrêter la surveillance, ni par une automatisation, ni par un bouton de tableau de bord, ni par un assistant vocal."
+          "allow_control": "Permet à Home Assistant d'allumer et d'éteindre la station de base ; le capteur Station de base allumée devient alors un interrupteur. Désactivé par défaut : l'intégration n'écrit alors qu'APP_ACTIVE et ne peut jamais arrêter la surveillance, ni par une automatisation, ni par un bouton de tableau de bord, ni par un assistant vocal.",
+          "capture_raw": "Écrit dans le journal de Home Assistant (logger custom_components.owlet.capture, niveau INFO) les propriétés brutes que le cloud Owlet renvoie pour chaque chaussette : au démarrage de la capture, à chaque changement d'une valeur d'état et toutes les 5 minutes. Les jetons, l'adresse e-mail, les numéros de série et les adresses MAC ne sont jamais enregistrés. Destiné à l'analyse, à désactiver ensuite. Désactivé par défaut."
         }
       }
     }
