@@ -136,6 +136,18 @@
       },
       "preview_drm_alarm": {
         "name": "Pré-alarme priorité DRM"
+      },
+      "alert_silenced": {
+        "name": "Alerte mise en sourdine"
+      },
+      "recovery_mode": {
+        "name": "Mode récupération"
+      },
+      "readings_valid": {
+        "name": "Mesures valides"
+      },
+      "data_not_updating": {
+        "name": "Données non mises à jour"
       }
     },
     "sensor": {
@@ -163,10 +175,11 @@
       "sleepstate": {
         "name": "État de sommeil",
         "state": {
-          "unknown": "Inconnu",
+          "no_data": "Aucune donnée",
           "awake": "Réveillé",
           "light_sleep": "Sommeil léger",
-          "deep_sleep": "Sommeil profond"
+          "deep_sleep": "Sommeil profond",
+          "unknown": "Inconnu"
         }
       },
       "movement": {
@@ -189,6 +202,89 @@
       },
       "battery_status": {
         "name": "État de la batterie"
+      },
+      "status": {
+        "name": "Statut",
+        "state": {
+          "trouble_getting_data": "Problème de récupération des données",
+          "sock_charged": "Chaussette chargée",
+          "sock_charging": "Chaussette en charge",
+          "base_station_off": "Station de base éteinte",
+          "critical_oxygen": "Oxygène critique",
+          "low_heart_rate_low_oxygen": "Fréquence cardiaque basse, oxygène faible",
+          "high_heart_rate_low_oxygen": "Fréquence cardiaque élevée, oxygène faible",
+          "low_heart_rate_high_oxygen": "Fréquence cardiaque basse, oxygène élevé",
+          "high_heart_rate_high_oxygen": "Fréquence cardiaque élevée, oxygène élevé",
+          "high_oxygen": "Oxygène élevé",
+          "low_oxygen": "Oxygène faible",
+          "low_heart_rate": "Fréquence cardiaque basse",
+          "high_heart_rate": "Fréquence cardiaque élevée",
+          "discomfort": "Inconfort",
+          "sensor_soft_bricked": "Capteur bloqué (soft brick)",
+          "sock_off_baby": "Chaussette retirée du bébé",
+          "low_light_level": "Faible luminosité",
+          "sock_disconnected_from_base": "Chaussette déconnectée de la station de base",
+          "kicking": "Coups de pied",
+          "sock_recently_placed": "Chaussette posée récemment",
+          "sock_readings_invalid": "Mesures de la chaussette invalides",
+          "low_sock_battery": "Batterie de la chaussette faible",
+          "normal": "Normal",
+          "unknown": "Inconnu"
+        }
+      },
+      "base_state": {
+        "name": "État de la base",
+        "state": {
+          "on_station": "Chaussette sur la station",
+          "unknown": "Inconnu"
+        }
+      },
+      "base_battery": {
+        "name": "Batterie de secours de la base",
+        "state": {
+          "not_charging": "Ne charge pas",
+          "charging": "En charge",
+          "charged": "Chargée",
+          "fault": "Défaut",
+          "not_present": "Absente"
+        }
+      },
+      "session_started": {
+        "name": "Début de la session"
+      },
+      "body_position": {
+        "name": "Position du corps",
+        "state": {
+          "moving": "En mouvement",
+          "undetected": "Non détectée",
+          "no_data": "Aucune donnée",
+          "on_back": "Sur le dos",
+          "side": "Sur le côté",
+          "tummy": "Sur le ventre"
+        }
+      },
+      "reading_state": {
+        "name": "État de la mesure",
+        "state": {
+          "normal": "Normal",
+          "no_valid_readings": "Aucune mesure valide",
+          "kicking": "Coups de pied",
+          "just_placed": "Vient d'être posée",
+          "unknown": "Inconnu"
+        }
+      },
+      "sleep_code_minute": {
+        "name": "Code de sommeil de cette minute"
+      },
+      "sleep_state_minute": {
+        "name": "État de sommeil de cette minute",
+        "state": {
+          "no_data": "Aucune donnée",
+          "awake": "Réveillé",
+          "light_sleep": "Sommeil léger",
+          "deep_sleep": "Sommeil profond",
+          "unknown": "Inconnu"
+        }
       }
     },
     "switch": {

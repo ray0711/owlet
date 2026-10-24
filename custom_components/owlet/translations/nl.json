@@ -136,6 +136,18 @@
       },
       "preview_drm_alarm": {
         "name": "Vooralarm DRM prioriteit"
+      },
+      "alert_silenced": {
+        "name": "Alarm gedempt"
+      },
+      "recovery_mode": {
+        "name": "Herstelmodus"
+      },
+      "readings_valid": {
+        "name": "Metingen geldig"
+      },
+      "data_not_updating": {
+        "name": "Gegevens worden niet bijgewerkt"
       }
     },
     "sensor": {
@@ -163,10 +175,11 @@
       "sleepstate": {
         "name": "Slaaptoestand",
         "state": {
-          "unknown": "Onbekend",
+          "no_data": "Geen gegevens",
           "awake": "Wakker",
           "light_sleep": "Lichte slaap",
-          "deep_sleep": "Diepe slaap"
+          "deep_sleep": "Diepe slaap",
+          "unknown": "Onbekend"
         }
       },
       "movement": {
@@ -189,6 +202,89 @@
       },
       "battery_status": {
         "name": "Batterijstatus"
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "trouble_getting_data": "Problemen met ophalen van gegevens",
+          "sock_charged": "Sok opgeladen",
+          "sock_charging": "Sok wordt opgeladen",
+          "base_station_off": "Basisstation uit",
+          "critical_oxygen": "Kritiek zuurstofgehalte",
+          "low_heart_rate_low_oxygen": "Lage hartslag, laag zuurstofgehalte",
+          "high_heart_rate_low_oxygen": "Hoge hartslag, laag zuurstofgehalte",
+          "low_heart_rate_high_oxygen": "Lage hartslag, hoog zuurstofgehalte",
+          "high_heart_rate_high_oxygen": "Hoge hartslag, hoog zuurstofgehalte",
+          "high_oxygen": "Hoog zuurstofgehalte",
+          "low_oxygen": "Laag zuurstofgehalte",
+          "low_heart_rate": "Lage hartslag",
+          "high_heart_rate": "Hoge hartslag",
+          "discomfort": "Ongemak",
+          "sensor_soft_bricked": "Sensor geblokkeerd (soft brick)",
+          "sock_off_baby": "Sok van baby af",
+          "low_light_level": "Weinig licht",
+          "sock_disconnected_from_base": "Sok niet verbonden met basisstation",
+          "kicking": "Trappelen",
+          "sock_recently_placed": "Sok net aangedaan",
+          "sock_readings_invalid": "Metingen van sok ongeldig",
+          "low_sock_battery": "Batterij van sok bijna leeg",
+          "normal": "Normaal",
+          "unknown": "Onbekend"
+        }
+      },
+      "base_state": {
+        "name": "Status basisstation",
+        "state": {
+          "on_station": "Sok op het station",
+          "unknown": "Onbekend"
+        }
+      },
+      "base_battery": {
+        "name": "Reservebatterij basisstation",
+        "state": {
+          "not_charging": "Niet aan het opladen",
+          "charging": "Opladen",
+          "charged": "Opgeladen",
+          "fault": "Storing",
+          "not_present": "Niet aanwezig"
+        }
+      },
+      "session_started": {
+        "name": "Sessie gestart"
+      },
+      "body_position": {
+        "name": "Lichaamshouding",
+        "state": {
+          "moving": "Beweegt",
+          "undetected": "Niet gedetecteerd",
+          "no_data": "Geen gegevens",
+          "on_back": "Op de rug",
+          "side": "Op de zij",
+          "tummy": "Op de buik"
+        }
+      },
+      "reading_state": {
+        "name": "Meetstatus",
+        "state": {
+          "normal": "Normaal",
+          "no_valid_readings": "Geen geldige metingen",
+          "kicking": "Trappelen",
+          "just_placed": "Net aangedaan",
+          "unknown": "Onbekend"
+        }
+      },
+      "sleep_code_minute": {
+        "name": "Slaapcode van deze minuut"
+      },
+      "sleep_state_minute": {
+        "name": "Slaaptoestand van deze minuut",
+        "state": {
+          "no_data": "Geen gegevens",
+          "awake": "Wakker",
+          "light_sleep": "Lichte slaap",
+          "deep_sleep": "Diepe slaap",
+          "unknown": "Onbekend"
+        }
       }
     },
     "switch": {

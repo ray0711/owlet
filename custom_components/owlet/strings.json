@@ -136,6 +136,18 @@
       },
       "preview_drm_alarm": {
         "name": "Preview DRM priority alarm"
+      },
+      "alert_silenced": {
+        "name": "Alert silenced"
+      },
+      "recovery_mode": {
+        "name": "Recovery mode"
+      },
+      "readings_valid": {
+        "name": "Readings valid"
+      },
+      "data_not_updating": {
+        "name": "Data not updating"
       }
     },
     "sensor": {
@@ -163,10 +175,11 @@
       "sleepstate": {
         "name": "Sleep state",
         "state": {
-          "unknown": "Unknown",
+          "no_data": "No data",
           "awake": "Awake",
           "light_sleep": "Light sleep",
-          "deep_sleep": "Deep sleep"
+          "deep_sleep": "Deep sleep",
+          "unknown": "Unknown"
         }
       },
       "movement": {
@@ -189,6 +202,89 @@
       },
       "battery_status": {
         "name": "Battery status"
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "trouble_getting_data": "Trouble getting data",
+          "sock_charged": "Sock charged",
+          "sock_charging": "Sock charging",
+          "base_station_off": "Base station off",
+          "critical_oxygen": "Critical oxygen",
+          "low_heart_rate_low_oxygen": "Low heart rate, low oxygen",
+          "high_heart_rate_low_oxygen": "High heart rate, low oxygen",
+          "low_heart_rate_high_oxygen": "Low heart rate, high oxygen",
+          "high_heart_rate_high_oxygen": "High heart rate, high oxygen",
+          "high_oxygen": "High oxygen",
+          "low_oxygen": "Low oxygen",
+          "low_heart_rate": "Low heart rate",
+          "high_heart_rate": "High heart rate",
+          "discomfort": "Discomfort",
+          "sensor_soft_bricked": "Sensor soft bricked",
+          "sock_off_baby": "Sock off baby",
+          "low_light_level": "Low light level",
+          "sock_disconnected_from_base": "Sock disconnected from base",
+          "kicking": "Kicking",
+          "sock_recently_placed": "Sock recently placed",
+          "sock_readings_invalid": "Sock readings invalid",
+          "low_sock_battery": "Low sock battery",
+          "normal": "Normal",
+          "unknown": "Unknown"
+        }
+      },
+      "base_state": {
+        "name": "Base state",
+        "state": {
+          "on_station": "Sock on station",
+          "unknown": "Unknown"
+        }
+      },
+      "base_battery": {
+        "name": "Base backup battery",
+        "state": {
+          "not_charging": "Not charging",
+          "charging": "Charging",
+          "charged": "Charged",
+          "fault": "Fault",
+          "not_present": "Not present"
+        }
+      },
+      "session_started": {
+        "name": "Session started"
+      },
+      "body_position": {
+        "name": "Body position",
+        "state": {
+          "moving": "Moving",
+          "undetected": "Undetected",
+          "no_data": "No data",
+          "on_back": "On back",
+          "side": "On side",
+          "tummy": "On tummy"
+        }
+      },
+      "reading_state": {
+        "name": "Reading state",
+        "state": {
+          "normal": "Normal",
+          "no_valid_readings": "No valid readings",
+          "kicking": "Kicking",
+          "just_placed": "Just placed",
+          "unknown": "Unknown"
+        }
+      },
+      "sleep_code_minute": {
+        "name": "Sleep code of this minute"
+      },
+      "sleep_state_minute": {
+        "name": "Sleep state of this minute",
+        "state": {
+          "no_data": "No data",
+          "awake": "Awake",
+          "light_sleep": "Light sleep",
+          "deep_sleep": "Deep sleep",
+          "unknown": "Unknown"
+        }
       }
     },
     "switch": {
