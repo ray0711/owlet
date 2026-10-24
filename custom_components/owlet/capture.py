@@ -32,7 +32,7 @@ HEARTBEAT = timedelta(minutes=5)
 
 # Keys of REAL_TIME_VITALS that move with every reading or tick up with time.
 FAST_VITAL_KEYS = frozenset(
-    {"hr", "ox", "st", "mv", "mvb", "oxta", "rsi", "bat", "btt", "pi", "mts"}
+    {"hr", "ox", "st", "mv", "mvb", "bp", "oxta", "rsi", "bat", "btt", "pi", "mts"}
 )
 
 # Properties that move with every reading, tick up with time or are toggled by
