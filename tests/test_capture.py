@@ -22,7 +22,12 @@ from custom_components.owlet.capture import (
     RawCapture,
     describe_property,
 )
-from custom_components.owlet.const import CONF_CAPTURE_RAW, DOMAIN
+from custom_components.owlet.const import (
+    CONF_CAPTURE_RAW,
+    CONF_STALE_THRESHOLD,
+    DEFAULT_STALE_THRESHOLD,
+    DOMAIN,
+)
 from custom_components.owlet.owletapi.exceptions import OwletConnectionError
 from homeassistant.components.diagnostics import REDACTED
 from homeassistant.config_entries import ConfigEntryState
@@ -368,8 +373,14 @@ async def test_turning_the_option_off_stops_the_capture(
     assert len(lines(caplog)) == 1
 
     result = await hass.config_entries.options.async_init(capture_entry.entry_id)
+    # The form still caps the threshold at 120; the test entry holds 300 s.
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {**capture_entry.options, CONF_CAPTURE_RAW: False}
+        result["flow_id"],
+        {
+            **capture_entry.options,
+            CONF_STALE_THRESHOLD: DEFAULT_STALE_THRESHOLD,
+            CONF_CAPTURE_RAW: False,
+        },
     )
     await hass.async_block_till_done()
 

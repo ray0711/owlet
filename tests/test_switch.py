@@ -7,7 +7,12 @@ from unittest.mock import AsyncMock
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.owlet.const import CONF_ALLOW_CONTROL, DOMAIN
+from custom_components.owlet.const import (
+    CONF_ALLOW_CONTROL,
+    CONF_STALE_THRESHOLD,
+    DEFAULT_STALE_THRESHOLD,
+    DOMAIN,
+)
 from custom_components.owlet.owletapi.exceptions import OwletConnectionError
 from homeassistant.components.switch import (
     DOMAIN as SWITCH_DOMAIN,
@@ -129,8 +134,14 @@ async def test_toggling_option_swaps_entities(
         result = await hass.config_entries.options.async_init(
             mock_config_entry.entry_id
         )
+        # The form still caps the threshold at 120; the test entry holds 300 s.
         await hass.config_entries.options.async_configure(
-            result["flow_id"], {**mock_config_entry.options, CONF_ALLOW_CONTROL: allow}
+            result["flow_id"],
+            {
+                **mock_config_entry.options,
+                CONF_STALE_THRESHOLD: DEFAULT_STALE_THRESHOLD,
+                CONF_ALLOW_CONTROL: allow,
+            },
         )
         await hass.async_block_till_done()
 

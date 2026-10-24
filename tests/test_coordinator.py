@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+import json
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -14,6 +15,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.owlet.const import CONF_STALE_THRESHOLD, DOMAIN
+from custom_components.owlet.coordinator import OwletCoordinator
 from custom_components.owlet.owletapi.exceptions import (
     OwletAuthenticationError,
     OwletConnectionError,
@@ -429,3 +431,284 @@ async def test_repair_issue_removed_on_unload(
 
     assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
     assert issue_registry.async_get_issue(DOMAIN, STALE_ISSUE) is None
+
+
+# Live Dream Sock fixtures, frozen 3 s after their vitals timestamp.
+ON_FOOT_TIME = "2026-10-24T14:23:10+00:00"
+SOCK_OFF_TIME = "2026-10-24T15:04:11+00:00"
+ON_STATION_TIME = "2026-10-24T15:36:47+00:00"
+COLD_BOOT_TIME = "2026-10-24T15:35:56+00:00"
+REMOVE = object()
+
+
+def _coordinator(entry: MockConfigEntry) -> OwletCoordinator:
+    return next(iter(entry.runtime_data.values()))
+
+
+def _live(name: str, flags: dict[str, Any] | None = None, **vitals: Any) -> dict:
+    """Return a live fixture with vitals and flag properties patched.
+
+    A vitals value of REMOVE drops the key from the vitals JSON.
+    """
+    data = load_json(f"{name}.json")
+    raw = data["response"]["REAL_TIME_VITALS"]
+    values = json.loads(raw["value"])
+    for key, value in vitals.items():
+        if value is REMOVE:
+            values.pop(key, None)
+        else:
+            values[key] = value
+    raw["value"] = json.dumps(values)
+    for key, value in (flags or {}).items():
+        data["response"][key]["value"] = value
+    return data
+
+
+async def _setup_with_options(
+    hass: HomeAssistant, entry: MockConfigEntry, **options: Any
+) -> OwletCoordinator:
+    """Set the entry up with options replaced; a value of REMOVE drops it."""
+    entry.add_to_hass(hass)
+    merged = {**entry.options, **options}
+    hass.config_entries.async_update_entry(
+        entry, options={k: v for k, v in merged.items() if v is not REMOVE}
+    )
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return _coordinator(entry)
+
+
+@pytest.mark.freeze_time(ON_FOOT_TIME)
+@pytest.mark.parametrize("properties_fixture", ["live_on_foot.json"])
+async def test_default_threshold_is_20_seconds(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Without the option a reading is trusted for 20 s, as in the app."""
+    coordinator = await _setup_with_options(
+        hass, mock_config_entry, **{CONF_STALE_THRESHOLD: REMOVE}
+    )
+    assert coordinator.stale_threshold == timedelta(seconds=20)
+
+    freezer.move_to("2026-10-24T14:23:26+00:00")  # 19 s old
+    assert coordinator.vitals_fresh is True
+    freezer.move_to("2026-10-24T14:23:27+00:00")  # 20 s old
+    assert coordinator.vitals_fresh is True
+    freezer.move_to("2026-10-24T14:23:28+00:00")  # 21 s old
+    assert coordinator.vitals_fresh is False
+    assert coordinator.is_reading_fresh("heart_rate") is False
+
+
+@pytest.mark.freeze_time("2023-11-20T14:07:01+00:00")
+@pytest.mark.parametrize("properties_fixture", ["update_properties_v2.json"])
+async def test_version_2_threshold_is_at_least_300(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """A Smart Sock 2 keeps a threshold of at least 300 s whatever is configured."""
+    coordinator = await _setup_with_options(
+        hass, mock_config_entry, **{CONF_STALE_THRESHOLD: 20}
+    )
+    assert coordinator.sock.version == 2
+    assert coordinator.stale_threshold == timedelta(seconds=300)
+    # HEART_RATE was written 120 s ago.
+    assert coordinator.is_reading_fresh("heart_rate") is True
+    # The worn-sock rule has no effect on a Smart Sock 2.
+    assert coordinator.readings_valid is True
+
+
+@pytest.mark.freeze_time(SOCK_OFF_TIME)
+async def test_readings_valid_with_placement_alarm(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """The sock-off alarm (flag or mask bit 64) makes the readings invalid."""
+    _serve(mock_owlet_api, _live("live_sock_off"))
+    await setup_integration(hass, mock_config_entry)
+    coordinator = _coordinator(mock_config_entry)
+    assert coordinator.alert_state("sock_off") is True
+    assert coordinator.readings_valid is False
+
+    # The mask alone is enough.
+    _serve(mock_owlet_api, _live("live_sock_off", {"SOCK_OFF": 0}, srf=0))
+    await coordinator.async_refresh()
+    assert coordinator.readings_valid is False
+
+    _serve(mock_owlet_api, _live("live_sock_off", {"SOCK_OFF": 0}, alrt=0, srf=0))
+    await coordinator.async_refresh()
+    assert coordinator.alert_state("sock_off") is False
+    assert coordinator.readings_valid is True
+
+
+@pytest.mark.freeze_time(ON_FOOT_TIME)
+async def test_alarm_bit_16_makes_readings_invalid(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """A sensor disconnected bit in the mask makes the readings invalid."""
+    _serve(mock_owlet_api, _live("live_on_foot", alrt=16))
+    await setup_integration(hass, mock_config_entry)
+    coordinator = _coordinator(mock_config_entry)
+    assert coordinator.readings_valid is False
+
+
+@pytest.mark.freeze_time(COLD_BOOT_TIME)
+@pytest.mark.parametrize(
+    ("srf", "valid"), [(3, False), (1, False), (2, False), (0, True)]
+)
+async def test_srf_on_dream_hardware(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    srf: int,
+    valid: bool,
+) -> None:
+    """On a Dream Sock any reading flag other than 0 means no valid readings."""
+    _serve(mock_owlet_api, _live("live_cold_boot", srf=srf))
+    await setup_integration(hass, mock_config_entry)
+    assert _coordinator(mock_config_entry).readings_valid is valid
+
+
+@pytest.mark.freeze_time(COLD_BOOT_TIME)
+@pytest.mark.parametrize("hw", ["obl", REMOVE])
+async def test_srf_ignored_on_other_hardware(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    hw: Any,
+) -> None:
+    """Other or unknown hardware never uses the reading flag for validity."""
+    _serve(mock_owlet_api, _live("live_cold_boot", srf=1, hw=hw))
+    await setup_integration(hass, mock_config_entry)
+    coordinator = _coordinator(mock_config_entry)
+    assert coordinator.readings_valid is True
+    assert coordinator.reading_available("heart_rate", False, True) is True
+
+
+@pytest.mark.freeze_time(COLD_BOOT_TIME)
+async def test_srf_absent_is_valid(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """A Dream Sock that sends no reading flag is not invalidated."""
+    _serve(mock_owlet_api, _live("live_cold_boot", srf=REMOVE))
+    await setup_integration(hass, mock_config_entry)
+    coordinator = _coordinator(mock_config_entry)
+    assert "readings_flag" not in coordinator.sock.properties
+    assert coordinator.readings_valid is True
+
+
+@pytest.mark.freeze_time(SOCK_OFF_TIME)
+@pytest.mark.parametrize("properties_fixture", ["live_sock_off.json"])
+async def test_needs_worn_sock_gates_vitals(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """Vitals flagged as needing a worn sock are hidden; the battery is not."""
+    await setup_integration(hass, mock_config_entry)
+    coordinator = _coordinator(mock_config_entry)
+    assert coordinator.reading_available("heart_rate", False, True) is False
+    assert coordinator.reading_available("heart_rate", False) is True
+    assert coordinator.reading_available("battery_percentage", True, False) is True
+
+
+@pytest.mark.parametrize(
+    ("properties_fixture", "expected"),
+    [
+        pytest.param(
+            "live_on_foot.json", "normal", marks=pytest.mark.freeze_time(ON_FOOT_TIME)
+        ),
+        pytest.param(
+            "live_sock_off.json",
+            "sock_off_baby",
+            marks=pytest.mark.freeze_time(SOCK_OFF_TIME),
+        ),
+        pytest.param(
+            "live_on_station.json",
+            "sock_charged",
+            marks=pytest.mark.freeze_time(ON_STATION_TIME),
+        ),
+        pytest.param(
+            "live_cold_boot.json",
+            "sock_recently_placed",
+            marks=pytest.mark.freeze_time(COLD_BOOT_TIME),
+        ),
+    ],
+)
+async def test_status_property(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer: FrozenDateTimeFactory,
+    expected: str,
+) -> None:
+    """The status line follows the app; stale vitals report trouble."""
+    await setup_integration(hass, mock_config_entry)
+    coordinator = _coordinator(mock_config_entry)
+    assert coordinator.status == expected
+
+    # The vitals are now 301 s old, past the 300 s of the test entry.
+    freezer.tick(timedelta(seconds=298))
+    assert coordinator.status == "trouble_getting_data"
+
+
+@pytest.mark.freeze_time(ON_FOOT_TIME)
+@pytest.mark.parametrize("properties_fixture", ["live_on_foot.json"])
+async def test_threshold_zero_disables_freshness(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """With the threshold at 0 even an hours old reading is shown."""
+    coordinator = await _setup_with_options(
+        hass, mock_config_entry, **{CONF_STALE_THRESHOLD: 0}
+    )
+    assert coordinator.stale_threshold is None
+
+    await _tick(hass, freezer, timedelta(hours=3))
+
+    assert coordinator.reading_available("heart_rate", False, True) is True
+    assert coordinator.status == "normal"
+    assert state(hass, *HEART_RATE).state == "150.0"
+
+
+@pytest.mark.freeze_time(ON_FOOT_TIME)
+@pytest.mark.parametrize(
+    ("patch_vitals", "expected"),
+    [
+        ({"value": "x"}, "unknown"),
+        ({"value": "{}"}, "unknown"),
+        ({"data_updated_at": REMOVE}, "trouble_getting_data"),
+        ({"data_updated_at": "2026-10-24 14:23:07"}, "trouble_getting_data"),
+        ({"data_updated_at": "2026-10-24T14:33:10Z"}, "trouble_getting_data"),
+    ],
+)
+async def test_status_with_unreadable_vitals_and_bad_timestamps(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    patch_vitals: dict[str, Any],
+    expected: str,
+) -> None:
+    """Unreadable vitals or unusable timestamps never raise and invent nothing."""
+    data = load_json("live_on_foot.json")
+    vitals = data["response"]["REAL_TIME_VITALS"]
+    for key, value in patch_vitals.items():
+        if value is REMOVE:
+            del vitals[key]
+        else:
+            vitals[key] = value
+    _serve(mock_owlet_api, data)
+    await setup_integration(hass, mock_config_entry)
+    coordinator = _coordinator(mock_config_entry)
+
+    assert coordinator.status == expected
+    assert coordinator.readings_valid is True

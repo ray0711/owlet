@@ -26,21 +26,43 @@ from .const import (
     DEFAULT_CAPTURE_RAW,
     DEFAULT_STALE_THRESHOLD,
     DOMAIN,
+    DREAM_HARDWARE,
     FRESHNESS_PROPERTIES,
     MAX_FUTURE_SKEW,
     OWLET_CREDENTIAL_ERRORS,
     POLLING_INTERVAL,
     STALE_ISSUE_AFTER,
+    V2_MIN_STALE_THRESHOLD,
     VITAL_PROPERTIES_V2,
     VITALS_PROPERTY_V3,
 )
 from .owletapi.exceptions import OwletConnectionError, OwletError, OwletRateLimitError
 from .owletapi.sock import Sock
+from .owletapi.states import (
+    ALERT_BITS,
+    PLACEMENT_BITS,
+    StatusInputs,
+    alert_active,
+    compute_status,
+)
 
 if TYPE_CHECKING:
     from . import OwletConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
+
+# Alerts the status line looks at.
+STATUS_ALERTS = (
+    "critical_oxygen_alert",
+    "high_oxygen_alert",
+    "low_oxygen_alert",
+    "high_heart_rate_alert",
+    "low_heart_rate_alert",
+    "discomfort_alert",
+    "sock_off",
+    "low_integrity_reading",
+    "sock_disconnected",
+)
 
 # Why the latest reading is not trusted, shown on the Data stale sensor.
 REASON_NO_TIMESTAMP = "no_timestamp"
@@ -294,11 +316,19 @@ class OwletCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @property
     def stale_threshold(self) -> timedelta | None:
-        """Return the configured staleness threshold, None when disabled."""
-        minutes = self.config_entry.options.get(
+        """Return the configured staleness threshold, None when disabled.
+
+        A Smart Sock 2 timestamps a vital only when it changes, so it never
+        gets less than V2_MIN_STALE_THRESHOLD.
+        """
+        seconds = self.config_entry.options.get(
             CONF_STALE_THRESHOLD, DEFAULT_STALE_THRESHOLD
         )
-        return timedelta(minutes=minutes) if minutes else None
+        if not seconds:
+            return None
+        if self.sock.version == 2:
+            seconds = max(seconds, V2_MIN_STALE_THRESHOLD)
+        return timedelta(seconds=seconds)
 
     def _is_fresh(self, updated: datetime | None) -> bool:
         """Return True when a reading timestamp is within the threshold."""
@@ -317,16 +347,85 @@ class OwletCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Return True when the reading behind a normalised property is fresh."""
         return self._is_fresh(self.reading_updated_at(key))
 
-    def reading_available(self, key: str, available_during_charging: bool) -> bool:
+    def reading_available(
+        self, key: str, available_during_charging: bool, needs_worn_sock: bool = False
+    ) -> bool:
         """Return whether an entity taken from the sock's data may show a value.
 
         Nothing from a reading that is not fresh is shown, not even the alerts,
         the battery or the charging state: an old reading says nothing about
-        now. Live vitals are hidden while the sock charges as well.
+        now. Live vitals are hidden while the sock charges as well, and those
+        that need a worn sock while the readings are not valid.
         """
         if not self.is_reading_fresh(key):
             return False
+        if needs_worn_sock and not self.readings_valid:
+            return False
         return available_during_charging or not self.sock.properties.get("charging")
+
+    # Worn sock and status
+
+    def alert_state(self, key: str) -> bool | None:
+        """Return whether an alert is active: its flag, else its bit in the mask."""
+        properties = self.sock.properties
+        flag = properties.get(key)
+        bit = ALERT_BITS.get(key)
+        if bit is None:
+            return flag
+        return alert_active(flag, properties.get("alerts_mask"), bit)
+
+    @property
+    def readings_valid(self) -> bool:
+        """Return False when the sock is not on the foot or says its readings are bad.
+
+        A placement alarm (the sock off flag, or the sock off or sensor
+        disconnected bit of the mask) counts on every version 3 sock. The
+        reading flag only on a Dream Sock: older hardware reports 1 with valid
+        readings. Anything absent or unknown never invalidates. A Smart Sock 2
+        is never gated.
+        """
+        if self.sock.version == 2:
+            return True
+        properties = self.sock.properties
+        mask = properties.get("alerts_mask")
+        if properties.get("sock_off") or (mask is not None and mask & PLACEMENT_BITS):
+            return False
+        readings_flag = properties.get("readings_flag")
+        return not (
+            properties.get("hardware_version") == DREAM_HARDWARE
+            and readings_flag is not None
+            and readings_flag != 0
+        )
+
+    @property
+    def status(self) -> str:
+        """Return the app's status line for the sock, unknown without any vitals."""
+        properties = self.sock.properties
+        inputs = StatusInputs(
+            fresh=self.vitals_fresh,
+            charging=properties.get("charging"),
+            soft_brick=properties.get("brick_status"),
+            base_on=properties.get("base_station_on"),
+            sock_connection=properties.get("sock_connection"),
+            readings_flag=properties.get("readings_flag"),
+            battery_minutes=properties.get("battery_minutes"),
+            alerts={key: self.alert_state(key) for key in STATUS_ALERTS},
+        )
+        has_vitals = any(
+            value is not None
+            for value in (
+                inputs.charging,
+                inputs.soft_brick,
+                inputs.base_on,
+                inputs.sock_connection,
+                inputs.readings_flag,
+                inputs.battery_minutes,
+                properties.get("alerts_mask"),
+            )
+        )
+        if inputs.fresh and not has_vitals:
+            return compute_status(None)
+        return compute_status(inputs)
 
     @property
     def readings_expected(self) -> bool | None:

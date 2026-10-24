@@ -43,8 +43,21 @@ SUPPORTED_VERSIONS: Final = [2, 3]
 POLLING_INTERVAL: Final = 10
 MIN_POLLING_INTERVAL: Final = 5
 
-# Minutes without a fresh reading before vitals are treated as stale, 0 disables.
-DEFAULT_STALE_THRESHOLD: Final = 5
+# Seconds without a fresh reading before vitals are treated as stale, 0
+# disables. 20 s is what the Owlet app uses. A non-zero value must also be at
+# least the polling interval plus STALE_POLL_MARGIN.
+DEFAULT_STALE_THRESHOLD: Final = 20
+MIN_STALE_THRESHOLD: Final = 15
+MAX_STALE_THRESHOLD: Final = 7200
+STALE_POLL_MARGIN: Final = 10
+
+# The Smart Sock 2 timestamps a vital only when its value changes, so it keeps
+# a threshold of at least this many seconds whatever is configured.
+V2_MIN_STALE_THRESHOLD: Final = 300
+
+# The hw value of a Dream Sock in REAL_TIME_VITALS. Only this hardware is
+# known to use the reading flag (srf) to say that its readings are invalid.
+DREAM_HARDWARE: Final = "obs4"
 
 # How long data has to stay stale before a repair issue is raised.
 STALE_ISSUE_AFTER: Final = timedelta(hours=1)

@@ -15,7 +15,6 @@ from custom_components.owlet.const import (
     CONF_OWLET_EXPIRY,
     CONF_OWLET_REFRESH,
     CONF_STALE_THRESHOLD,
-    DEFAULT_STALE_THRESHOLD,
     DOMAIN,
     POLLING_INTERVAL,
 )
@@ -59,7 +58,8 @@ def mock_config_entry() -> MockConfigEntry:
         },
         options={
             CONF_SCAN_INTERVAL: POLLING_INTERVAL,
-            CONF_STALE_THRESHOLD: DEFAULT_STALE_THRESHOLD,
+            # Seconds; the existing tests work with the old five minutes.
+            CONF_STALE_THRESHOLD: 300,
         },
     )
 
