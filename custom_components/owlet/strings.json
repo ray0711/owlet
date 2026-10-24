@@ -51,13 +51,15 @@
           "scan_interval": "Polling interval (seconds)",
           "stale_threshold": "Stale data threshold (minutes)",
           "activation_interval": "Activation interval (seconds)",
-          "allow_control": "Allow base station control"
+          "allow_control": "Allow base station control",
+          "capture_raw": "Capture raw data in the log"
         },
         "data_description": {
           "scan_interval": "Seconds between requests to the Owlet cloud, minimum 5. Every poll costs several API calls per sock, a lower value increases the risk of rate limiting.",
           "stale_threshold": "When the Owlet cloud has no new reading for this many minutes, vitals become unavailable and the Data stale sensor turns on. Set to 0 to disable.",
           "activation_interval": "Longest time between two APP_ACTIVE writes, the signal that tells the base station a client is watching so it keeps uploading vitals. The base station uploads for about 45 seconds after each write and then reports that it stopped; the integration writes again as soon as it sees that, so this is only a ceiling. Between 10 and 600.",
-          "allow_control": "Lets Home Assistant switch the base station on and off, which turns the Base station on sensor into a switch. Off by default: the integration then only writes APP_ACTIVE and can never stop the monitoring, not by an automation, a dashboard tap or a voice assistant."
+          "allow_control": "Lets Home Assistant switch the base station on and off, which turns the Base station on sensor into a switch. Off by default: the integration then only writes APP_ACTIVE and can never stop the monitoring, not by an automation, a dashboard tap or a voice assistant.",
+          "capture_raw": "Writes the raw properties the Owlet cloud reports for each sock to the Home Assistant log (logger custom_components.owlet.capture, level INFO): when the capture starts, whenever a status value changes, and every 5 minutes. Tokens, email, serial numbers and MAC addresses are never logged. Meant for analysis, turn it off when done. Off by default."
         }
       }
     }

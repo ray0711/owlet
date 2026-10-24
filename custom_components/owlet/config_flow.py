@@ -28,9 +28,11 @@ from . import ENTRY_VERSION, OwletConfigEntry, account_unique_id
 from .const import (
     CONF_ACTIVATION_INTERVAL,
     CONF_ALLOW_CONTROL,
+    CONF_CAPTURE_RAW,
     CONF_STALE_THRESHOLD,
     DEFAULT_ACTIVATION_INTERVAL,
     DEFAULT_ALLOW_CONTROL,
+    DEFAULT_CAPTURE_RAW,
     DEFAULT_STALE_THRESHOLD,
     DOMAIN,
     MAX_ACTIVATION_INTERVAL,
@@ -284,6 +286,10 @@ class OwletOptionsFlow(OptionsFlowWithReload):
                 vol.Required(
                     CONF_ALLOW_CONTROL,
                     default=options.get(CONF_ALLOW_CONTROL, DEFAULT_ALLOW_CONTROL),
+                ): bool,
+                vol.Required(
+                    CONF_CAPTURE_RAW,
+                    default=options.get(CONF_CAPTURE_RAW, DEFAULT_CAPTURE_RAW),
                 ): bool,
             }
         )

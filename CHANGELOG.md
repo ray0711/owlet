@@ -3,6 +3,7 @@
 <!--next-version-placeholder-->
 ## Unreleased
 ### Feature
+* New opt-in option **Capture raw data in the log** (off by default). Writes the raw properties of each sock to the Home Assistant log (`custom_components.owlet.capture`, INFO) when the capture starts, when a status value changes and every 5 minutes, using the same allowlist as the diagnostics, extended with the properties the Owlet app reads from a Smart Sock 3 / Dream Sock (sleep history, perfusion index, alarm limits, session time). Tokens, email, serial numbers and MAC addresses are never logged. The diagnostics download shares that allowlist, so it now also shows the values of those additional properties.
 * New opt-in option **Allow base station control** (off by default). When enabled, the base station state becomes a **Base station on** switch again (same unique id) and the API client additionally accepts `BASE_STATION_ON_CMD`; every other write except `APP_ACTIVE` is still refused. With the option off nothing changes: read-only binary sensor, no way to switch the base station. Changing the option swaps the binary sensor and the switch automatically.
 
 ## 2026.10.1 (2026-10-12)

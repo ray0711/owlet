@@ -17,9 +17,12 @@ from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .capture import RawCapture
 from .const import (
     BACKOFF_MAX,
+    CONF_CAPTURE_RAW,
     CONF_STALE_THRESHOLD,
+    DEFAULT_CAPTURE_RAW,
     DEFAULT_STALE_THRESHOLD,
     DOMAIN,
     FRESHNESS_PROPERTIES,
@@ -78,9 +81,13 @@ class OwletCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     config_entry: OwletConfigEntry
 
     def __init__(
-        self, hass: HomeAssistant, entry: OwletConfigEntry, sock: Sock
+        self, hass: HomeAssistant, entry: OwletConfigEntry, sock: Sock, index: int
     ) -> None:
-        """Initialise the coordinator."""
+        """Initialise the coordinator.
+
+        The index only names the sock in the raw capture, which never logs
+        the serial number.
+        """
         interval = entry.options.get(CONF_SCAN_INTERVAL) or POLLING_INTERVAL
         super().__init__(
             hass,
@@ -97,6 +104,10 @@ class OwletCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # off, None until a fresh reading has been seen.
         self._readings_expected: bool | None = None
         self._expiry_unsub: CALLBACK_TYPE | None = None
+        self._capture: RawCapture | None = None
+        if bool(entry.options.get(CONF_CAPTURE_RAW, DEFAULT_CAPTURE_RAW)):
+            self._capture = RawCapture(index)
+            self._capture.start()
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch the latest properties from the Owlet cloud.
@@ -133,10 +144,26 @@ class OwletCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 self.config_entry, data={**self.config_entry.data, **tokens}
             )
 
+        self._record_capture()
         self._remember_expectation()
         self._schedule_expiry()
         self._async_update_stale_issue()
         return self.sock.properties
+
+    def _record_capture(self) -> None:
+        """Log the raw properties when the capture is on.
+
+        A debugging aid must never be able to break polling, so a failure turns
+        the capture off for this sock instead of failing the update.
+        """
+        if self._capture is None:
+            return
+        try:
+            self._capture.record(self.sock.raw_properties, dt_util.utcnow())
+        except Exception:
+            _LOGGER.warning("Raw data capture failed and is turned off", exc_info=True)
+            self._capture.stop()
+            self._capture = None
 
     def _next_retry(self, minimum: float | None = None) -> float:
         """Return how long to wait before the next poll after a failure.
@@ -163,8 +190,10 @@ class OwletCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
     async def async_shutdown(self) -> None:
-        """Stop polling and cancel the expiry timer."""
+        """Stop polling, the raw capture and cancel the expiry timer."""
         self._cancel_expiry()
+        if self._capture is not None:
+            self._capture.stop()
         await super().async_shutdown()
 
     # Repair issue
