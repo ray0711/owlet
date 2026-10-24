@@ -252,3 +252,35 @@ async def test_version_2_migration_keeps_the_other_options(
         CONF_ACTIVATION_INTERVAL: 120,
         CONF_ALLOW_CONTROL: True,
     }
+
+
+@pytest.mark.parametrize(
+    ("options", "expected"),
+    [
+        ({CONF_SCAN_INTERVAL: None, CONF_STALE_THRESHOLD: 5}, 20),
+        ({CONF_STALE_THRESHOLD: "10"}, 20),
+        ({CONF_STALE_THRESHOLD: 2.5}, 20),
+        ({CONF_STALE_THRESHOLD: True}, 20),
+        ({CONF_STALE_THRESHOLD: -1}, 20),
+    ],
+)
+async def test_version_2_migration_survives_odd_stored_values(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    options: dict[str, object],
+    expected: int,
+) -> None:
+    """Null or oddly typed stored options do not stop the entry from loading."""
+    old_entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=2,
+        title=mock_config_entry.title,
+        unique_id=mock_config_entry.unique_id,
+        data=dict(mock_config_entry.data),
+        options=options,
+    )
+    await setup_integration(hass, old_entry)
+
+    assert old_entry.state is ConfigEntryState.LOADED
+    assert old_entry.options[CONF_STALE_THRESHOLD] == expected

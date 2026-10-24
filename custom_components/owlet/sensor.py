@@ -91,7 +91,12 @@ def _raw_attribute(key: str) -> Callable[[OwletCoordinator], dict[str, Any]]:
 def _session_started(coordinator: OwletCoordinator) -> datetime | None:
     """Return when the monitoring session started, None for 0 or absent."""
     started = _property(coordinator, "monitoring_start_time")
-    return datetime.fromtimestamp(started, UTC) if started else None
+    if not started:
+        return None
+    try:
+        return datetime.fromtimestamp(started, UTC)
+    except (OverflowError, OSError, ValueError):
+        return None
 
 
 def _minute_code(coordinator: OwletCoordinator) -> int | None:
@@ -402,13 +407,13 @@ class OwletDerivedSensor(OwletBaseEntity, SensorEntity):
     def available(self) -> bool:
         """Return if entity is available."""
         description = self.entity_description
-        return super().available and (
-            description.always_available
-            or self.coordinator.reading_available(
-                description.source_key,
-                description.available_during_charging,
-                description.needs_worn_sock,
-            )
+        if description.always_available:
+            # Reports trouble_getting_data during an outage, never unavailable.
+            return True
+        return super().available and self.coordinator.reading_available(
+            description.source_key,
+            description.available_during_charging,
+            description.needs_worn_sock,
         )
 
     @property

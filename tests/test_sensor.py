@@ -13,6 +13,7 @@ from pytest_homeassistant_custom_component.common import (
 )
 
 from custom_components.owlet.const import CONF_STALE_THRESHOLD, DOMAIN
+from custom_components.owlet.owletapi.exceptions import OwletConnectionError
 from custom_components.owlet.owletapi.states import STATUS_OPTIONS
 from custom_components.owlet.sensor import OwletDerivedSensor
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
@@ -250,6 +251,20 @@ async def test_session_started(
     await setup_integration(hass, mock_config_entry)
 
     assert _state(hass, "session_started") == "2026-10-24T12:40:27+00:00"
+
+
+async def test_session_started_unknown_for_out_of_range(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer,
+) -> None:
+    """A start time in milliseconds is unknown instead of an error."""
+    freezer.move_to(ON_FOOT)
+    _patch_vitals(mock_owlet_api, "live_on_foot.json", mst=10**13)
+    await setup_integration(hass, mock_config_entry)
+
+    assert _state(hass, "session_started") == STATE_UNKNOWN
 
 
 async def test_session_started_unknown_for_zero(
@@ -646,6 +661,32 @@ async def test_status_stays_available_when_stale(
 
     assert _state(hass, "heart_rate") == STATE_UNAVAILABLE
     assert _state(hass, "status") == "trouble_getting_data"
+
+
+@pytest.mark.parametrize("properties_fixture", ["live_on_foot.json"])
+async def test_status_stays_available_when_polls_fail(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    freezer,
+) -> None:
+    """During a cloud outage the status reports trouble_getting_data."""
+    freezer.move_to(ON_FOOT)
+    _use_threshold(hass, mock_config_entry, 20)
+    await setup_integration(hass, mock_config_entry)
+    assert _state(hass, "status") == "normal"
+
+    mock_owlet_api["get_properties"].side_effect = OwletConnectionError()
+    freezer.tick(timedelta(seconds=10))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert _state(hass, "status") != STATE_UNAVAILABLE
+
+    freezer.tick(timedelta(seconds=11))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert _state(hass, "status") == "trouble_getting_data"
+    assert _state(hass, "heart_rate") == STATE_UNAVAILABLE
 
 
 @pytest.mark.freeze_time("2023-11-20T14:06:00+00:00")

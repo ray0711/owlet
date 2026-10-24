@@ -77,9 +77,17 @@ def account_unique_id(region: str, username: str) -> str:
     return f"{region}_{username.strip().lower()}"
 
 
-def migrate_stale_threshold(minutes: int | None) -> int:
-    """Convert a stored stale threshold from minutes to seconds."""
-    if minutes is None or minutes == _OLD_DEFAULT_STALE_MINUTES:
+def migrate_stale_threshold(minutes: object) -> int:
+    """Convert a stored stale threshold from minutes to seconds.
+
+    Anything that is not a non-negative int gets the default.
+    """
+    if (
+        not isinstance(minutes, int)
+        or isinstance(minutes, bool)
+        or minutes < 0
+        or minutes == _OLD_DEFAULT_STALE_MINUTES
+    ):
         return DEFAULT_STALE_THRESHOLD
     if minutes == 0:
         return 0
@@ -94,7 +102,7 @@ def _migrated_options(options: Mapping[str, Any]) -> dict[str, Any]:
     """
     threshold = migrate_stale_threshold(options.get(CONF_STALE_THRESHOLD))
     if threshold:
-        scan_interval = options.get(CONF_SCAN_INTERVAL, POLLING_INTERVAL)
+        scan_interval = options.get(CONF_SCAN_INTERVAL) or POLLING_INTERVAL
         threshold = min(
             max(threshold, MIN_STALE_THRESHOLD, scan_interval + STALE_POLL_MARGIN),
             MAX_STALE_THRESHOLD,
