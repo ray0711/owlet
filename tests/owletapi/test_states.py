@@ -10,8 +10,11 @@ from custom_components.owlet.owletapi.states import (
     ALERT_BITS,
     BIT_DATA_NOT_UPDATING,
     PLACEMENT_BITS,
+    STATUS_OPTIONS,
     SleepPoint,
+    StatusInputs,
     alert_active,
+    compute_status,
     decode_base_battery,
     decode_base_state,
     decode_body_position,
@@ -152,3 +155,117 @@ def test_alert_constants() -> None:
     assert ALERT_BITS["lost_power_alert"] == 8192
     assert BIT_DATA_NOT_UPDATING == 128
     assert PLACEMENT_BITS == 80
+
+
+def _inputs(**kwargs: object) -> StatusInputs:
+    """Return inputs for a healthy sock on the foot, with overrides."""
+    alerts = kwargs.pop("alerts", {})
+    values: dict[str, object] = {
+        "fresh": True,
+        "charging": 0,
+        "soft_brick": 0,
+        "base_on": True,
+        "sock_connection": 2,
+        "readings_flag": 0,
+        "battery_minutes": 600.0,
+    }
+    values.update(kwargs)
+    return StatusInputs(alerts=alerts, **values)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("rule", "inputs", "expected"),
+    [
+        (1, _inputs(fresh=False), "trouble_getting_data"),
+        (2, _inputs(charging=2), "sock_charged"),
+        (2, _inputs(charging=1), "sock_charging"),
+        (2, _inputs(charging=1, soft_brick=1), "sensor_soft_bricked"),
+        (2, _inputs(charging=2, soft_brick=1), "sensor_soft_bricked"),
+        (3, _inputs(base_on=False), "base_station_off"),
+        (4, _inputs(alerts={"critical_oxygen_alert": True}), "critical_oxygen"),
+        (
+            5,
+            _inputs(alerts={"low_heart_rate_alert": True, "low_oxygen_alert": True}),
+            "low_heart_rate_low_oxygen",
+        ),
+        (
+            5,
+            _inputs(alerts={"high_heart_rate_alert": True, "low_oxygen_alert": True}),
+            "high_heart_rate_low_oxygen",
+        ),
+        (
+            5,
+            _inputs(alerts={"low_heart_rate_alert": True, "high_oxygen_alert": True}),
+            "low_heart_rate_high_oxygen",
+        ),
+        (
+            5,
+            _inputs(alerts={"high_heart_rate_alert": True, "high_oxygen_alert": True}),
+            "high_heart_rate_high_oxygen",
+        ),
+        (6, _inputs(alerts={"high_oxygen_alert": True}), "high_oxygen"),
+        (6, _inputs(alerts={"low_oxygen_alert": True}), "low_oxygen"),
+        (6, _inputs(alerts={"low_heart_rate_alert": True}), "low_heart_rate"),
+        (6, _inputs(alerts={"high_heart_rate_alert": True}), "high_heart_rate"),
+        (7, _inputs(alerts={"discomfort_alert": True}), "discomfort"),
+        (8, _inputs(soft_brick=1), "sensor_soft_bricked"),
+        (9, _inputs(alerts={"sock_off": True}), "sock_off_baby"),
+        (10, _inputs(alerts={"low_integrity_reading": True}), "low_light_level"),
+        (
+            11,
+            _inputs(alerts={"sock_disconnected": True}),
+            "sock_disconnected_from_base",
+        ),
+        (12, _inputs(sock_connection=2, readings_flag=2), "kicking"),
+        (13, _inputs(readings_flag=3), "sock_recently_placed"),
+        (14, _inputs(readings_flag=1), "sock_readings_invalid"),
+        (15, _inputs(sock_connection=2, battery_minutes=239), "low_sock_battery"),
+        (16, _inputs(), "normal"),
+    ],
+)
+def test_status_each_rule(rule: int, inputs: StatusInputs, expected: str) -> None:
+    """Each rule of the status table gives its state."""
+    assert compute_status(inputs) == expected
+    assert expected in STATUS_OPTIONS
+
+
+def test_status_order() -> None:
+    """The first matching rule wins."""
+    sock_off = {"sock_off": True}
+    assert compute_status(_inputs(fresh=False, charging=1)) == "trouble_getting_data"
+    assert compute_status(_inputs(charging=1, alerts=sock_off)) == "sock_charging"
+    assert (
+        compute_status(_inputs(base_on=False, alerts={"high_oxygen_alert": True}))
+        == "base_station_off"
+    )
+    assert (
+        compute_status(_inputs(readings_flag=3, alerts={"low_oxygen_alert": True}))
+        == "low_oxygen"
+    )
+    assert compute_status(_inputs(sock_connection=1, readings_flag=2)) == "normal"
+    assert compute_status(_inputs(battery_minutes=240)) == "normal"
+    assert compute_status(_inputs(sock_connection=1, battery_minutes=10)) == "normal"
+    # A false or absent alarm never matches.
+    assert compute_status(_inputs(alerts={"sock_off": False})) == "normal"
+    # Two heart rate alarms without an oxygen alarm fall to the singles order.
+    both_hr = {"low_heart_rate_alert": True, "high_heart_rate_alert": True}
+    assert compute_status(_inputs(alerts=both_hr)) == "low_heart_rate"
+
+
+def test_status_unknown_inputs() -> None:
+    """Absent inputs never match a rule; no data at all is unknown."""
+    assert compute_status(None) == "unknown"
+    empty = StatusInputs(
+        fresh=True,
+        charging=None,
+        soft_brick=None,
+        base_on=None,
+        sock_connection=None,
+        readings_flag=None,
+        battery_minutes=None,
+        alerts={},
+    )
+    assert compute_status(empty) == "normal"
+    none_alerts = {k: None for k in ALERT_BITS}
+    assert compute_status(_inputs(alerts=none_alerts)) == "normal"
+    assert "unknown" in STATUS_OPTIONS

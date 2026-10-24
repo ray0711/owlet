@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
@@ -38,6 +39,34 @@ SLEEP_OPTIONS: tuple[str, ...] = (
     "deep_sleep",
     "unknown",
 )
+
+STATUS_OPTIONS: tuple[str, ...] = (
+    "trouble_getting_data",
+    "sock_charged",
+    "sock_charging",
+    "base_station_off",
+    "critical_oxygen",
+    "low_heart_rate_low_oxygen",
+    "high_heart_rate_low_oxygen",
+    "low_heart_rate_high_oxygen",
+    "high_heart_rate_high_oxygen",
+    "high_oxygen",
+    "low_oxygen",
+    "low_heart_rate",
+    "high_heart_rate",
+    "discomfort",
+    "sensor_soft_bricked",
+    "sock_off_baby",
+    "low_light_level",
+    "sock_disconnected_from_base",
+    "kicking",
+    "sock_recently_placed",
+    "sock_readings_invalid",
+    "low_sock_battery",
+    "normal",
+    "unknown",
+)
+LOW_BATTERY_MINUTES = 240
 
 ALERT_BITS: dict[str, int] = {
     "low_oxygen_alert": 1,
@@ -158,3 +187,72 @@ def alert_active(flag: bool | None, mask: int | None, bit: int) -> bool | None:
     if mask is not None:
         return bool(mask & bit)
     return None
+
+
+@dataclass(frozen=True)
+class StatusInputs:
+    """Inputs of the status line; None means the value is absent."""
+
+    fresh: bool
+    charging: int | None
+    soft_brick: int | None
+    base_on: bool | None
+    sock_connection: int | None
+    readings_flag: int | None
+    battery_minutes: float | None
+    alerts: Mapping[str, bool | None]
+
+
+def compute_status(data: StatusInputs | None) -> str:
+    """Return the app's status line; the first matching rule wins."""
+    if data is None:
+        return "unknown"
+    if not data.fresh:
+        return "trouble_getting_data"
+
+    def on(key: str) -> bool:
+        return data.alerts.get(key) is True
+
+    if data.charging in (1, 2):
+        if data.soft_brick == 1:
+            return "sensor_soft_bricked"
+        return "sock_charged" if data.charging == 2 else "sock_charging"
+    if data.base_on is False:
+        return "base_station_off"
+    if on("critical_oxygen_alert"):
+        return "critical_oxygen"
+    heart = [h for h in ("low", "high") if on(f"{h}_heart_rate_alert")]
+    oxygen = [o for o in ("low", "high") if on(f"{o}_oxygen_alert")]
+    if heart and oxygen:
+        return f"{heart[0]}_heart_rate_{oxygen[0]}_oxygen"
+    for key in (
+        "high_oxygen_alert",
+        "low_oxygen_alert",
+        "low_heart_rate_alert",
+        "high_heart_rate_alert",
+    ):
+        if on(key):
+            return key.removesuffix("_alert")
+    if on("discomfort_alert"):
+        return "discomfort"
+    if data.soft_brick == 1:
+        return "sensor_soft_bricked"
+    if on("sock_off"):
+        return "sock_off_baby"
+    if on("low_integrity_reading"):
+        return "low_light_level"
+    if on("sock_disconnected"):
+        return "sock_disconnected_from_base"
+    if data.sock_connection == 2 and data.readings_flag == 2:
+        return "kicking"
+    if data.readings_flag == 3:
+        return "sock_recently_placed"
+    if data.readings_flag == 1:
+        return "sock_readings_invalid"
+    if (
+        data.sock_connection == 2
+        and data.battery_minutes is not None
+        and data.battery_minutes < LOW_BATTERY_MINUTES
+    ):
+        return "low_sock_battery"
+    return "normal"
