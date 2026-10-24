@@ -114,6 +114,15 @@ def test_fast_moving_values_do_not_cause_a_line(
     assert len(lines(caplog)) == 1
 
 
+def test_body_position_does_not_cause_a_line() -> None:
+    """The body position changes on every reading of a real Dream Sock."""
+    capture = RawCapture(0)
+    capture.record(raw(vitals(bp=11, mvb=0, rsi=72)), START)
+
+    assert capture.record(raw(vitals(bp=1, mvb=16, rsi=65)), START) is False
+    assert capture.record(raw(vitals(bp=4, mvb=25, rsi=62)), START) is False
+
+
 def test_a_changed_status_is_logged_with_the_fast_values(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
