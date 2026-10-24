@@ -11,6 +11,7 @@ from pytest_homeassistant_custom_component.components.diagnostics import (
 )
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
+from custom_components.owlet.const import CONF_STALE_THRESHOLD, DOMAIN
 from homeassistant.components.diagnostics import REDACTED
 from homeassistant.core import HomeAssistant
 
@@ -58,3 +59,52 @@ async def test_diagnostics(
     assert "D0ECE231F766" not in dump
     assert "F832C96E47EF" not in dump
     assert "aylanetworks.com/apiv1/devices" not in dump
+
+
+@pytest.mark.freeze_time("2026-10-24T15:04:11+00:00")
+@pytest.mark.parametrize("properties_fixture", ["live_sock_off.json"])
+async def test_diagnostics_has_new_fields(
+    hass: HomeAssistant,
+    hass_client: ClientSessionGenerator,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """Diagnostics carry the validity, the status and the threshold in seconds."""
+    await setup_integration(hass, mock_config_entry)
+
+    result = await get_diagnostics_for_config_entry(
+        hass, hass_client, mock_config_entry
+    )
+
+    sock = result["socks"][0]
+    assert sock["readings_valid"] is False
+    assert sock["status"] == "sock_off_baby"
+    assert sock["stale_threshold_seconds"] == 300
+
+
+@pytest.mark.freeze_time("2026-10-24T15:04:11+00:00")
+@pytest.mark.parametrize("properties_fixture", ["live_sock_off.json"])
+async def test_diagnostics_default_threshold(
+    hass: HomeAssistant,
+    hass_client: ClientSessionGenerator,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """Without the option the default threshold of 20 seconds is reported."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=mock_config_entry.version,
+        title=mock_config_entry.title,
+        unique_id=mock_config_entry.unique_id,
+        data=mock_config_entry.data,
+        options={
+            k: v
+            for k, v in mock_config_entry.options.items()
+            if k != CONF_STALE_THRESHOLD
+        },
+    )
+    await setup_integration(hass, entry)
+
+    result = await get_diagnostics_for_config_entry(hass, hass_client, entry)
+
+    assert result["socks"][0]["stale_threshold_seconds"] == 20

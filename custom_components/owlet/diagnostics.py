@@ -26,6 +26,7 @@ async def async_get_config_entry_diagnostics(
     for index, coordinator in enumerate(entry.runtime_data.values()):
         sock = coordinator.sock
         last_updated = coordinator.last_updated
+        threshold = coordinator.stale_threshold
         socks.append(
             {
                 "index": index,
@@ -41,6 +42,11 @@ async def async_get_config_entry_diagnostics(
                 "stale_reason": coordinator.stale_reason,
                 "readings_expected": coordinator.readings_expected,
                 "is_stale": coordinator.is_stale,
+                "readings_valid": coordinator.readings_valid,
+                "status": coordinator.status,
+                "stale_threshold_seconds": (
+                    int(threshold.total_seconds()) if threshold else None
+                ),
                 "properties": dict(sock.properties),
                 "raw_properties": {
                     name: describe_property(name, prop)
