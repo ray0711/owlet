@@ -1,0 +1,291 @@
+{
+  "response": {
+    "ALRT_PAUSE_CMD": {
+      "name": "ALRT_PAUSE_CMD",
+      "value": "redacted",
+      "base_type": "string",
+      "direction": "input",
+      "data_updated_at": "2026-10-24T15:04:08Z"
+    },
+    "APP_ACTIVE": {
+      "name": "APP_ACTIVE",
+      "value": 1,
+      "base_type": "boolean",
+      "direction": "input",
+      "data_updated_at": "2026-10-24T15:36:08Z"
+    },
+    "APP_CMD_REQUEST": {
+      "name": "APP_CMD_REQUEST",
+      "value": "redacted",
+      "base_type": "string",
+      "direction": "input",
+      "data_updated_at": "2026-10-24T15:35:51Z"
+    },
+    "APP_CMD_RESPONSE": {
+      "name": "APP_CMD_RESPONSE",
+      "value": "redacted",
+      "base_type": "string",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:51Z"
+    },
+    "BASE_ERROR_LOG_FILE": {
+      "name": "BASE_ERROR_LOG_FILE",
+      "value": "redacted",
+      "base_type": "file",
+      "direction": "output",
+      "data_updated_at": "2026-10-15T09:45:58Z"
+    },
+    "BASE_EVT_LOG_FILE": {
+      "name": "BASE_EVT_LOG_FILE",
+      "value": "redacted",
+      "base_type": "file",
+      "direction": "output",
+      "data_updated_at": "null"
+    },
+    "BASE_MON_STATUS": {
+      "name": "BASE_MON_STATUS",
+      "value": 8,
+      "base_type": "integer",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:36:44Z"
+    },
+    "BASE_STATION_ON_CMD": {
+      "name": "BASE_STATION_ON_CMD",
+      "value": "redacted",
+      "base_type": "string",
+      "direction": "input",
+      "data_updated_at": "2026-10-24T12:02:34Z"
+    },
+    "BATTERY_STATUS": {
+      "name": "BATTERY_STATUS",
+      "value": 512,
+      "base_type": "integer",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:51Z"
+    },
+    "CONFIG_STATUS": {
+      "name": "CONFIG_STATUS",
+      "value": "redacted",
+      "base_type": "string",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:51Z"
+    },
+    "DEVICE_PING": {
+      "name": "DEVICE_PING",
+      "value": 0,
+      "base_type": "integer",
+      "direction": "input",
+      "data_updated_at": "2026-10-24T15:35:50Z"
+    },
+    "DISCOMFORT_ALRT": {
+      "name": "DISCOMFORT_ALRT",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:49Z"
+    },
+    "FW_UPDATE_STATUS": {
+      "name": "FW_UPDATE_STATUS",
+      "value": "{\"primary\":\"IDLE\"}",
+      "base_type": "string",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:51Z"
+    },
+    "HIGH_HR_ALRT": {
+      "name": "HIGH_HR_ALRT",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:48Z"
+    },
+    "HIGH_OX_ALRT": {
+      "name": "HIGH_OX_ALRT",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:48Z"
+    },
+    "LOST_POWER_ALRT": {
+      "name": "LOST_POWER_ALRT",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:49Z"
+    },
+    "LOW_BATT_ALRT": {
+      "name": "LOW_BATT_ALRT",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:49Z"
+    },
+    "LOW_HR_ALRT": {
+      "name": "LOW_HR_ALRT",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:48Z"
+    },
+    "LOW_INTEG_READ": {
+      "name": "LOW_INTEG_READ",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:49Z"
+    },
+    "LOW_OX_ALRT": {
+      "name": "LOW_OX_ALRT",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:48Z"
+    },
+    "LOW_POWER_MODE_CMD": {
+      "name": "LOW_POWER_MODE_CMD",
+      "value": "redacted",
+      "base_type": "string",
+      "direction": "input",
+      "data_updated_at": "null"
+    },
+    "MISC_LOG_FILE_DATA": {
+      "name": "MISC_LOG_FILE_DATA",
+      "value": "redacted",
+      "base_type": "file",
+      "direction": "output",
+      "data_updated_at": "null"
+    },
+    "MOBILE_VITALS": {
+      "name": "MOBILE_VITALS",
+      "value": "{\"sh\":\"\"}",
+      "base_type": "string",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:51Z"
+    },
+    "MONITORING_SUMMARY": {
+      "name": "MONITORING_SUMMARY",
+      "value": "redacted",
+      "base_type": "string",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:11:15Z"
+    },
+    "PPG_LOG_FILE": {
+      "name": "PPG_LOG_FILE",
+      "value": "redacted",
+      "base_type": "file",
+      "direction": "output",
+      "data_updated_at": "2026-10-15T15:52:10Z"
+    },
+    "PREVIEW_DRM_PRIORITY_ALARM": {
+      "name": "PREVIEW_DRM_PRIORITY_ALARM",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:50Z"
+    },
+    "PREVIEW_HIGH_PRIORITY_ALARM": {
+      "name": "PREVIEW_HIGH_PRIORITY_ALARM",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:49Z"
+    },
+    "PREVIEW_LOW_PRIORITY_ALARM": {
+      "name": "PREVIEW_LOW_PRIORITY_ALARM",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:50Z"
+    },
+    "PREVIEW_MED_PRIORITY_ALARM": {
+      "name": "PREVIEW_MED_PRIORITY_ALARM",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:50Z"
+    },
+    "REAL_TIME_VITALS": {
+      "name": "REAL_TIME_VITALS",
+      "value": "{\"ox\":0,\"hr\":0,\"mv\":0,\"sc\":2,\"st\":0,\"bso\":0,\"bat\":100,\"btt\":0,\"chg\":2,\"aps\":0,\"alrt\":0,\"ota\":0,\"srf\":1,\"rsi\":21,\"sb\":0,\"ss\":0,\"mvb\":0,\"mst\":0,\"oxta\":255,\"onm\":3,\"bsb\":1,\"mrs\":1,\"bp\":0,\"hw\":\"obs4\"}",
+      "base_type": "string",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:36:44Z"
+    },
+    "RED_ALERT_SUMMARY": {
+      "name": "RED_ALERT_SUMMARY",
+      "value": "redacted",
+      "base_type": "string",
+      "direction": "output",
+      "data_updated_at": "2026-10-17T18:11:03Z"
+    },
+    "SENSOR_ERROR_LOG_FILE": {
+      "name": "SENSOR_ERROR_LOG_FILE",
+      "value": "redacted",
+      "base_type": "file",
+      "direction": "output",
+      "data_updated_at": "2026-10-15T09:46:15Z"
+    },
+    "SETTINGS_CMD": {
+      "name": "SETTINGS_CMD",
+      "value": "redacted",
+      "base_type": "string",
+      "direction": "input",
+      "data_updated_at": "2026-10-15T09:35:04Z"
+    },
+    "SETTINGS_STATUS": {
+      "name": "SETTINGS_STATUS",
+      "value": "redacted",
+      "base_type": "string",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:50Z"
+    },
+    "SOCK_DISCON_ALRT": {
+      "name": "SOCK_DISCON_ALRT",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:49Z"
+    },
+    "SOCK_OFF": {
+      "name": "SOCK_OFF",
+      "value": 0,
+      "base_type": "boolean",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:36:44Z"
+    },
+    "VITALS_LOG_DATA": {
+      "name": "VITALS_LOG_DATA",
+      "value": "redacted",
+      "base_type": "string",
+      "direction": "output",
+      "data_updated_at": "null"
+    },
+    "VITALS_LOG_FILE": {
+      "name": "VITALS_LOG_FILE",
+      "value": "redacted",
+      "base_type": "file",
+      "direction": "output",
+      "data_updated_at": "2026-10-15T15:53:25Z"
+    },
+    "oem_base_version": {
+      "name": "oem_base_version",
+      "value": "{\"app\":\"3.23.3.0-a1786fa\",\"hw\":\"obs4\",\"rev\":9,\"onm\":3,\"ce\":1,\"sd\":\"6.1.1\",\"bl\":\"0.7.34.0-3e109b0\"}",
+      "base_type": "string",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:50Z"
+    },
+    "oem_flash_version": {
+      "name": "oem_flash_version",
+      "value": "B3.23.3-a178_S3.15.2-eeae_BB0.7.34_SB0.7.33_SD6.1.1",
+      "base_type": "string",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:50Z"
+    },
+    "oem_sock_version": {
+      "name": "oem_sock_version",
+      "value": "{\"app\":\"3.15.2.0-eeaedb4\",\"sd\":\"6.1.1\",\"bl\":\"0.7.33.0-3e109b0\",\"hw\":\"oss\",\"rev\":9,\"phy\":1}",
+      "base_type": "string",
+      "direction": "output",
+      "data_updated_at": "2026-10-24T15:35:50Z"
+    }
+  }
+}

@@ -40,6 +40,8 @@ PropertyKey = Literal[
     "wellness_alert",
     "monitoring_start_time",
     "base_battery_status",
+    "body_position",
+    "recovery_mode",
     "hardware_version",
     "last_updated",
     "critical_battery_alert",
@@ -92,6 +94,8 @@ class Properties(TypedDict, total=False):
     wellness_alert: int | None
     monitoring_start_time: int | None
     base_battery_status: int | None
+    body_position: int | None
+    recovery_mode: int | None
     hardware_version: str | None
     last_updated: str | None
 
@@ -152,6 +156,8 @@ VITALS_3: dict[type, dict[PropertyKey, str]] = {
         "wellness_alert": "onm",
         "monitoring_start_time": "mst",
         "base_battery_status": "bsb",
+        "body_position": "bp",
+        "recovery_mode": "mrs",
     },
     str: {
         "hardware_version": "hw",

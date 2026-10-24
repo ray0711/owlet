@@ -8,6 +8,7 @@ from typing import Any, NotRequired, TypedDict
 
 from .api import OwletAPI, SockData, TokenDict
 from .const import PROPERTIES, VALID_RANGES, VITALS_2, VITALS_3, Properties, PropertyKey
+from .states import parse_sleep_string
 
 logger: Logger = logging.getLogger(__package__)
 
@@ -256,6 +257,16 @@ class Sock:
             if (parsed := self.property_updated_at(key)) is not None
         ]
         return max(timestamps) if timestamps else None
+
+    @property
+    def sleep_codes(self) -> list[int | None]:
+        """Return the per-minute sleep codes of MOBILE_VITALS, newest first."""
+        return parse_sleep_string(self._raw_value("MOBILE_VITALS"))
+
+    @property
+    def sleep_updated_at(self) -> datetime.datetime | None:
+        """Return when the sleep codes were last written, in UTC."""
+        return self.property_updated_at("MOBILE_VITALS")
 
     def property_updated_at(self, raw_key: str) -> datetime.datetime | None:
         """Return the sanitised data_updated_at of a raw property, in UTC."""

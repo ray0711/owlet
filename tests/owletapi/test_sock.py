@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -25,6 +26,14 @@ ACTIVATE_URL = f"{BASE}/dsns/{DSN}/properties/APP_ACTIVE/datapoints.json"
 COMMAND_URL = f"{BASE}/dsns/{DSN}/properties/BASE_STATION_ON_CMD/datapoints.json"
 
 REMOVE = object()
+
+LIVE_FIXTURES = Path(__file__).parent.parent / "fixtures"
+
+
+def _live(name: str) -> list[dict[str, Any]]:
+    """Return a capture fixture of tests/fixtures in the properties.json shape."""
+    response = json.loads((LIVE_FIXTURES / name).read_text())["response"]
+    return [{"property": prop} for prop in response.values()]
 
 
 def _v3(**overrides: Any) -> list[dict[str, Any]]:
@@ -261,3 +270,35 @@ def test_decoders_reject_garbage() -> None:
     assert decode_bool(2) is True
     assert decode_bool(" ON ") is True
     assert decode_bool(None) is None
+
+
+async def test_new_vitals_keys(mock_api: FakeSession, sock: Sock) -> None:
+    await _update(mock_api, sock, _live("live_on_foot.json"))
+
+    assert sock.properties["body_position"] == 7
+    assert sock.properties["recovery_mode"] == 1
+    assert sock.properties["hardware_version"] == "obs4"
+
+
+async def test_sleep_accessors(mock_api: FakeSession, sock: Sock) -> None:
+    await _update(mock_api, sock, _live("live_on_foot.json"))
+
+    assert sock.sleep_codes == [8] * 15
+    assert sock.sleep_updated_at == datetime.datetime(
+        2026, 10, 24, 14, 23, 1, tzinfo=datetime.UTC
+    )
+
+
+async def test_sleep_accessors_without_property(
+    mock_api: FakeSession, sock: Sock
+) -> None:
+    await _update(mock_api, sock, load("properties_v3.json"))
+
+    assert sock.sleep_codes == []
+    assert sock.sleep_updated_at is None
+
+
+async def test_sleep_codes_after_reboot(mock_api: FakeSession, sock: Sock) -> None:
+    await _update(mock_api, sock, _live("live_cold_boot.json"))
+
+    assert sock.sleep_codes == []
