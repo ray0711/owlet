@@ -36,11 +36,14 @@ from .const import (
     DEFAULT_STALE_THRESHOLD,
     DOMAIN,
     MAX_ACTIVATION_INTERVAL,
+    MAX_STALE_THRESHOLD,
     MIN_ACTIVATION_INTERVAL,
     MIN_POLLING_INTERVAL,
+    MIN_STALE_THRESHOLD,
     OWLET_CREDENTIAL_ERRORS,
     POLLING_INTERVAL,
     REGIONS,
+    STALE_POLL_MARGIN,
     SUPPORTED_VERSIONS,
 )
 from .owletapi.api import OwletAPI
@@ -260,8 +263,17 @@ class OwletOptionsFlow(OptionsFlowWithReload):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Manage the polling and staleness options."""
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            threshold = user_input[CONF_STALE_THRESHOLD]
+            # Zero disables the check; otherwise the threshold must outlast a
+            # poll, or the data would be stale between every two updates.
+            if threshold and threshold < max(
+                MIN_STALE_THRESHOLD, user_input[CONF_SCAN_INTERVAL] + STALE_POLL_MARGIN
+            ):
+                errors[CONF_STALE_THRESHOLD] = "threshold_too_low"
+            else:
+                return self.async_create_entry(data=user_input)
 
         options = self.config_entry.options
         schema = vol.Schema(
@@ -273,7 +285,7 @@ class OwletOptionsFlow(OptionsFlowWithReload):
                 vol.Required(
                     CONF_STALE_THRESHOLD,
                     default=options.get(CONF_STALE_THRESHOLD, DEFAULT_STALE_THRESHOLD),
-                ): vol.All(vol.Coerce(int), vol.Range(min=0, max=120)),
+                ): vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_STALE_THRESHOLD)),
                 vol.Required(
                     CONF_ACTIVATION_INTERVAL,
                     default=options.get(
@@ -294,4 +306,8 @@ class OwletOptionsFlow(OptionsFlowWithReload):
             }
         )
 
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self.add_suggested_values_to_schema(schema, user_input),
+            errors=errors,
+        )

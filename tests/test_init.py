@@ -7,7 +7,11 @@ from unittest.mock import AsyncMock
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.owlet.const import CONF_ACTIVATION_INTERVAL, DOMAIN
+from custom_components.owlet.const import (
+    CONF_ACTIVATION_INTERVAL,
+    CONF_STALE_THRESHOLD,
+    DOMAIN,
+)
 from custom_components.owlet.owletapi.exceptions import (
     OwletAuthenticationError,
     OwletConnectionError,
@@ -102,7 +106,7 @@ async def test_version_1_entry_is_migrated(
     await setup_integration(hass, old_entry)
 
     assert old_entry.state is ConfigEntryState.LOADED
-    assert old_entry.version == 2
+    assert old_entry.version == 3
     assert old_entry.unique_id == "europe_sample@gmail.com"
 
 
@@ -114,7 +118,7 @@ async def test_entry_from_a_newer_release_is_not_loaded(
     """A future entry version is left alone instead of being guessed at."""
     new_entry = MockConfigEntry(
         domain=DOMAIN,
-        version=3,
+        version=4,
         unique_id="europe_sample@gmail.com",
         data=dict(mock_config_entry.data),
     )
@@ -158,3 +162,57 @@ async def test_refreshed_tokens_are_stored(
     assert mock_config_entry.data["api_token"] == "new_api_token"
     assert mock_config_entry.data["refresh"] == "new_refresh_token"
     assert mock_config_entry.data["expiry"] == 200
+
+
+@pytest.mark.parametrize(
+    ("options", "expected"),
+    [
+        ({CONF_STALE_THRESHOLD: 5}, 20),
+        ({CONF_STALE_THRESHOLD: 0}, 0),
+        ({CONF_STALE_THRESHOLD: 10}, 600),
+        ({CONF_STALE_THRESHOLD: 150}, 7200),
+        ({}, 20),
+    ],
+)
+async def test_version_2_entry_threshold_migration(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    options: dict[str, int],
+    expected: int,
+) -> None:
+    """The stored threshold changes from minutes to seconds."""
+    old_entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=2,
+        title="sample@gmail.com",
+        unique_id="europe_sample@gmail.com",
+        data=dict(mock_config_entry.data),
+        options=options,
+    )
+    await setup_integration(hass, old_entry)
+
+    assert old_entry.state is ConfigEntryState.LOADED
+    assert old_entry.version == 3
+    assert old_entry.options[CONF_STALE_THRESHOLD] == expected
+
+
+async def test_version_1_entry_reaches_seconds(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """A version 1 entry runs both steps and ends with the threshold in seconds."""
+    old_entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=1,
+        title="sample@gmail.com",
+        unique_id="sample@gmail.com",
+        data=dict(mock_config_entry.data),
+        options={CONF_STALE_THRESHOLD: 10},
+    )
+    await setup_integration(hass, old_entry)
+
+    assert old_entry.version == 3
+    assert old_entry.unique_id == "europe_sample@gmail.com"
+    assert old_entry.options[CONF_STALE_THRESHOLD] == 600

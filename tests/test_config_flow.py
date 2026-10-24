@@ -75,7 +75,7 @@ async def test_user_flow(hass: HomeAssistant, mock_login: AsyncMock) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Sample@gmail.com"
     assert result["result"].unique_id == "europe_sample@gmail.com"
-    assert result["result"].version == 2
+    assert result["result"].version == 3
     # Logging in lists the devices (read only), so an account without a
     # supported sock is caught here.
     mock_login.get_devices.assert_awaited_once()
@@ -229,7 +229,7 @@ async def test_reconfigure_into_configured_region_aborts(
     mock_config_entry.add_to_hass(hass)
     MockConfigEntry(
         domain=DOMAIN,
-        version=2,
+        version=3,
         unique_id="world_sample@gmail.com",
         data={**mock_config_entry.data, CONF_REGION: "world"},
     ).add_to_hass(hass)
@@ -284,7 +284,7 @@ async def test_options_flow_capture_is_off_by_default(
         result["flow_id"],
         {
             CONF_SCAN_INTERVAL: 30,
-            CONF_STALE_THRESHOLD: 5,
+            CONF_STALE_THRESHOLD: 300,
             CONF_ACTIVATION_INTERVAL: 120,
         },
     )
@@ -304,7 +304,49 @@ async def test_options_flow_rejects_out_of_range_activation(
             result["flow_id"],
             {
                 CONF_SCAN_INTERVAL: 30,
-                CONF_STALE_THRESHOLD: 5,
+                CONF_STALE_THRESHOLD: 300,
                 CONF_ACTIVATION_INTERVAL: 1,
             },
         )
+
+
+@pytest.mark.parametrize(
+    ("scan_interval", "threshold", "accepted"),
+    [
+        (10, 10, False),
+        (10, 19, False),
+        (10, 20, True),
+        (5, 14, False),
+        (5, 15, True),
+        (30, 0, True),
+        (100, 100, False),
+        (100, 110, True),
+    ],
+)
+@pytest.mark.usefixtures("mock_login")
+async def test_options_flow_rejects_low_threshold(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    scan_interval: int,
+    threshold: int,
+    accepted: bool,
+) -> None:
+    """A non-zero threshold must be at least 15 s and the polling interval plus 10 s."""
+    mock_config_entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_SCAN_INTERVAL: scan_interval,
+            CONF_STALE_THRESHOLD: threshold,
+            CONF_ACTIVATION_INTERVAL: 120,
+        },
+    )
+    if accepted:
+        assert result["type"] is FlowResultType.CREATE_ENTRY
+        assert mock_config_entry.options[CONF_STALE_THRESHOLD] == threshold
+    else:
+        assert result["type"] is FlowResultType.FORM
+        assert result["errors"] == {CONF_STALE_THRESHOLD: "threshold_too_low"}
+        assert mock_config_entry.options[CONF_STALE_THRESHOLD] == 300

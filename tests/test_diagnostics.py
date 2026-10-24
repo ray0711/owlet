@@ -35,7 +35,7 @@ async def test_diagnostics(
 
     # The entry section is an allowlist: region and options, nothing else.
     assert result["entry"]["data"] == {"region": "europe"}
-    assert result["entry"]["version"] == 2
+    assert result["entry"]["version"] == 3
     dump = str(result)
     for secret in ("api_token", "refresh_token", "sample@gmail.com", "SERIAL_NUMBER"):
         assert secret not in dump, secret

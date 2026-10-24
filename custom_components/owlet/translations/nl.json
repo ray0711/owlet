@@ -49,19 +49,22 @@
         "title": "Opties voor Owlet",
         "data": {
           "scan_interval": "Polling-interval (seconden)",
-          "stale_threshold": "Drempel verouderde gegevens (minuten)",
+          "stale_threshold": "Drempel verouderde gegevens (seconden)",
           "activation_interval": "Activeringsinterval (seconden)",
           "allow_control": "Bediening basisstation toestaan",
           "capture_raw": "Ruwe gegevens in het log vastleggen"
         },
         "data_description": {
           "scan_interval": "Aantal seconden tussen twee aanvragen bij de Owlet-cloud, minimum 5. Elke poll kost meerdere API-calls per sok, een lagere waarde verhoogt het risico op rate limiting.",
-          "stale_threshold": "Als de Owlet-cloud zo veel minuten geen nieuwe meting heeft, worden de vitale waarden onbeschikbaar en gaat de sensor Verouderde gegevens aan. Zet op 0 om uit te schakelen.",
+          "stale_threshold": "Als de Owlet-cloud zo veel seconden geen nieuwe meting heeft, worden de vitale waarden onbeschikbaar en gaat de sensor Verouderde gegevens aan. Zet op 0 om uit te schakelen, anders minimaal 15 en minimaal het pollinginterval plus 10.",
           "activation_interval": "Langste tijd tussen twee keer schrijven van APP_ACTIVE, het signaal dat het basisstation vertelt dat er een client meekijkt zodat het vitale waarden blijft uploaden. Het basisstation uploadt ongeveer 45 seconden na elke keer schrijven en meldt daarna dat het gestopt is; de integratie schrijft dan meteen opnieuw, dus deze waarde is alleen een bovengrens. Tussen 10 en 600.",
           "allow_control": "Laat Home Assistant het basisstation aan- en uitzetten; de sensor Basisstation aan wordt dan een schakelaar. Standaard uit: de integratie schrijft dan alleen APP_ACTIVE en kan de bewaking nooit stoppen, ook niet via een automatisering, een dashboardknop of een spraakassistent.",
           "capture_raw": "Schrijft de ruwe eigenschappen die de Owlet-cloud per sok meldt naar het Home Assistant-log (logger custom_components.owlet.capture, niveau INFO): bij het starten, bij elke wijziging van een statuswaarde en elke 5 minuten. Tokens, e-mailadres, serienummers en MAC-adressen worden nooit gelogd. Bedoeld voor analyse, zet het uit als je klaar bent. Standaard uit."
         }
       }
+    },
+    "error": {
+      "threshold_too_low": "De waarde moet 0 zijn of minimaal 15 seconden, en minimaal het pollinginterval plus 10 seconden."
     }
   },
   "selector": {

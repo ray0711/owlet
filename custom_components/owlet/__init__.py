@@ -33,9 +33,12 @@ from .const import (
     CONF_ALLOW_CONTROL,
     CONF_OWLET_EXPIRY,
     CONF_OWLET_REFRESH,
+    CONF_STALE_THRESHOLD,
     DEFAULT_ACTIVATION_INTERVAL,
     DEFAULT_ALLOW_CONTROL,
+    DEFAULT_STALE_THRESHOLD,
     DOMAIN,
+    MAX_STALE_THRESHOLD,
     OWLET_CREDENTIAL_ERRORS,
     SUPPORTED_VERSIONS,
 )
@@ -51,8 +54,12 @@ _LOGGER = logging.getLogger(__name__)
 
 type OwletConfigEntry = ConfigEntry[dict[str, OwletCoordinator]]
 
-# Config entry version 2 identifies an account by region and email.
-ENTRY_VERSION = 2
+# Config entry version 2 identifies an account by region and email, version 3
+# stores the stale threshold in seconds instead of minutes.
+ENTRY_VERSION = 3
+
+# The stale threshold default of the minutes era, which maps to the new default.
+_OLD_DEFAULT_STALE_MINUTES = 5
 
 
 def account_unique_id(region: str, username: str) -> str:
@@ -62,6 +69,15 @@ def account_unique_id(region: str, username: str) -> str:
     accounts in Owlet's Europe and World regions.
     """
     return f"{region}_{username.strip().lower()}"
+
+
+def migrate_stale_threshold(minutes: int | None) -> int:
+    """Convert a stored stale threshold from minutes to seconds."""
+    if minutes is None or minutes == _OLD_DEFAULT_STALE_MINUTES:
+        return DEFAULT_STALE_THRESHOLD
+    if minutes == 0:
+        return 0
+    return min(minutes * 60, MAX_STALE_THRESHOLD)
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: OwletConfigEntry) -> bool:
@@ -75,11 +91,20 @@ async def async_migrate_entry(hass: HomeAssistant, entry: OwletConfigEntry) -> b
             unique_id=account_unique_id(
                 entry.data[CONF_REGION], entry.data[CONF_USERNAME]
             ),
-            version=ENTRY_VERSION,
+            version=2,
         )
-        _LOGGER.info(
-            "Migrated Owlet entry %s to version %s", entry.title, ENTRY_VERSION
+    if entry.version == 2:
+        hass.config_entries.async_update_entry(
+            entry,
+            options={
+                **entry.options,
+                CONF_STALE_THRESHOLD: migrate_stale_threshold(
+                    entry.options.get(CONF_STALE_THRESHOLD)
+                ),
+            },
+            version=3,
         )
+    _LOGGER.info("Migrated Owlet entry %s to version %s", entry.title, ENTRY_VERSION)
     return True
 
 
