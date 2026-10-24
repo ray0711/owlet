@@ -9,6 +9,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.owlet.const import (
     CONF_ACTIVATION_INTERVAL,
+    CONF_ALLOW_CONTROL,
     CONF_STALE_THRESHOLD,
     DOMAIN,
 )
@@ -18,6 +19,7 @@ from custom_components.owlet.owletapi.exceptions import (
     OwletDevicesError,
 )
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState
+from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
@@ -172,6 +174,11 @@ async def test_refreshed_tokens_are_stored(
         ({CONF_STALE_THRESHOLD: 10}, 600),
         ({CONF_STALE_THRESHOLD: 150}, 7200),
         ({}, 20),
+        ({CONF_SCAN_INTERVAL: 60, CONF_STALE_THRESHOLD: 5}, 70),
+        ({CONF_SCAN_INTERVAL: 30, CONF_STALE_THRESHOLD: 5}, 40),
+        ({CONF_SCAN_INTERVAL: 10, CONF_STALE_THRESHOLD: 5}, 20),
+        ({CONF_SCAN_INTERVAL: 60, CONF_STALE_THRESHOLD: 0}, 0),
+        ({CONF_SCAN_INTERVAL: 7195, CONF_STALE_THRESHOLD: 5}, 7200),
     ],
 )
 async def test_version_2_entry_threshold_migration(
@@ -216,3 +223,32 @@ async def test_version_1_entry_reaches_seconds(
     assert old_entry.version == 3
     assert old_entry.unique_id == "europe_sample@gmail.com"
     assert old_entry.options[CONF_STALE_THRESHOLD] == 600
+
+
+async def test_version_2_migration_keeps_the_other_options(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """Only the threshold is rewritten by the version 2 step."""
+    old_entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=2,
+        title="sample@gmail.com",
+        unique_id="europe_sample@gmail.com",
+        data=dict(mock_config_entry.data),
+        options={
+            CONF_SCAN_INTERVAL: 30,
+            CONF_STALE_THRESHOLD: 5,
+            CONF_ACTIVATION_INTERVAL: 120,
+            CONF_ALLOW_CONTROL: True,
+        },
+    )
+    await setup_integration(hass, old_entry)
+
+    assert old_entry.options == {
+        CONF_SCAN_INTERVAL: 30,
+        CONF_STALE_THRESHOLD: 40,
+        CONF_ACTIVATION_INTERVAL: 120,
+        CONF_ALLOW_CONTROL: True,
+    }

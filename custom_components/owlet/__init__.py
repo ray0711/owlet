@@ -12,7 +12,9 @@ Switching the base station on and off is an opt-in option ("allow_control").
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 import logging
+from typing import Any
 
 from aiohttp import ClientError
 
@@ -20,6 +22,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     CONF_API_TOKEN,
     CONF_REGION,
+    CONF_SCAN_INTERVAL,
     CONF_USERNAME,
     Platform,
 )
@@ -39,7 +42,10 @@ from .const import (
     DEFAULT_STALE_THRESHOLD,
     DOMAIN,
     MAX_STALE_THRESHOLD,
+    MIN_STALE_THRESHOLD,
     OWLET_CREDENTIAL_ERRORS,
+    POLLING_INTERVAL,
+    STALE_POLL_MARGIN,
     SUPPORTED_VERSIONS,
 )
 from .coordinator import OwletCoordinator
@@ -80,6 +86,22 @@ def migrate_stale_threshold(minutes: int | None) -> int:
     return min(minutes * 60, MAX_STALE_THRESHOLD)
 
 
+def _migrated_options(options: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the options of a version 2 entry with the threshold in seconds.
+
+    A non-zero threshold is raised to what the options form would accept, so
+    a slow polling interval does not leave the data stale between two polls.
+    """
+    threshold = migrate_stale_threshold(options.get(CONF_STALE_THRESHOLD))
+    if threshold:
+        scan_interval = options.get(CONF_SCAN_INTERVAL, POLLING_INTERVAL)
+        threshold = min(
+            max(threshold, MIN_STALE_THRESHOLD, scan_interval + STALE_POLL_MARGIN),
+            MAX_STALE_THRESHOLD,
+        )
+    return {**options, CONF_STALE_THRESHOLD: threshold}
+
+
 async def async_migrate_entry(hass: HomeAssistant, entry: OwletConfigEntry) -> bool:
     """Migrate a config entry from an earlier version."""
     if entry.version > ENTRY_VERSION:
@@ -96,12 +118,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: OwletConfigEntry) -> b
     if entry.version == 2:
         hass.config_entries.async_update_entry(
             entry,
-            options={
-                **entry.options,
-                CONF_STALE_THRESHOLD: migrate_stale_threshold(
-                    entry.options.get(CONF_STALE_THRESHOLD)
-                ),
-            },
+            options=_migrated_options(entry.options),
             version=3,
         )
     _LOGGER.info("Migrated Owlet entry %s to version %s", entry.title, ENTRY_VERSION)
