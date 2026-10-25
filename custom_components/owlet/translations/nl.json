@@ -108,7 +108,7 @@
         "name": "Alarm sok niet verbonden"
       },
       "sock_off": {
-        "name": "Sok uit"
+        "name": "Sok van de voet"
       },
       "awake": {
         "name": "Wakker"
@@ -145,17 +145,14 @@
       },
       "readings_valid": {
         "name": "Metingen geldig"
-      },
-      "data_not_updating": {
-        "name": "Gegevens worden niet bijgewerkt"
       }
     },
     "sensor": {
       "batterypercent": {
-        "name": "Batterijniveau"
+        "name": "Batterijniveau sok"
       },
       "signalstrength": {
-        "name": "Signaalsterkte"
+        "name": "Bluetooth-signaal sok"
       },
       "o2saturation": {
         "name": "O2-saturatie"
@@ -167,7 +164,7 @@
         "name": "Hartslag"
       },
       "batterymin": {
-        "name": "Resterende batterijduur"
+        "name": "Resterende batterijduur sok"
       },
       "skintemp": {
         "name": "Huidtemperatuur"
@@ -186,7 +183,7 @@
         "name": "Beweging"
       },
       "movementbucket": {
-        "name": "Bewegingscategorie"
+        "name": "Bewegingsniveau (categorie)"
       },
       "last_updated": {
         "name": "Laatste meting"
@@ -198,10 +195,7 @@
         "name": "Waarschuwingsmasker"
       },
       "base_mon_status": {
-        "name": "Bewakingsstatus basisstation"
-      },
-      "battery_status": {
-        "name": "Batterijstatus"
+        "name": "Bewakingsstatuscode basisstation"
       },
       "status": {
         "name": "Status",
@@ -232,13 +226,6 @@
           "unknown": "Onbekend"
         }
       },
-      "base_state": {
-        "name": "Status basisstation",
-        "state": {
-          "on_station": "Sok op het station",
-          "unknown": "Onbekend"
-        }
-      },
       "base_battery": {
         "name": "Reservebatterij basisstation",
         "state": {
@@ -263,28 +250,27 @@
           "tummy": "Op de buik"
         }
       },
-      "reading_state": {
-        "name": "Meetstatus",
+      "last_base_change": {
+        "name": "Laatste wijziging basisstation",
         "state": {
-          "normal": "Normaal",
-          "no_valid_readings": "Geen geldige metingen",
-          "kicking": "Trappelen",
-          "just_placed": "Net aangedaan",
+          "button": "Knop op het basisstation",
+          "cloud_command": "Cloudcommando (app of Home Assistant)",
+          "sock_station": "Sok op het station gelegd of eraf gehaald",
+          "power_up": "Opstarten",
           "unknown": "Onbekend"
         }
       },
-      "sleep_code_minute": {
-        "name": "Slaapcode van deze minuut"
-      },
-      "sleep_state_minute": {
-        "name": "Slaaptoestand van deze minuut",
+      "signal_quality": {
+        "name": "Bluetooth-kwaliteit sok",
         "state": {
-          "no_data": "Geen gegevens",
-          "awake": "Wakker",
-          "light_sleep": "Lichte slaap",
-          "deep_sleep": "Diepe slaap",
-          "unknown": "Onbekend"
+          "good": "Goed",
+          "okay": "Redelijk",
+          "poor": "Slecht",
+          "disconnected": "Verbroken"
         }
+      },
+      "sleep_history": {
+        "name": "Slaapgeschiedenis"
       }
     },
     "switch": {

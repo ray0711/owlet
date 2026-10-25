@@ -63,8 +63,17 @@
       "base_mon_status": {
         "default": "mdi:monitor-eye"
       },
-      "battery_status": {
-        "default": "mdi:battery-heart-variant"
+      "last_base_change": {
+        "default": "mdi:router-wireless-settings"
+      },
+      "signal_quality": {
+        "default": "mdi:bluetooth-connect",
+        "state": {
+          "disconnected": "mdi:bluetooth-off"
+        }
+      },
+      "sleep_history": {
+        "default": "mdi:chart-timeline"
       }
     },
     "switch": {

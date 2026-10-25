@@ -40,7 +40,9 @@ from .owletapi.exceptions import OwletConnectionError, OwletError, OwletRateLimi
 from .owletapi.sock import Sock
 from .owletapi.states import (
     ALERT_BITS,
+    INVALID_READING_FLAGS,
     PLACEMENT_BITS,
+    SOCK_CONNECTED,
     StatusInputs,
     alert_active,
     compute_status,
@@ -378,24 +380,46 @@ class OwletCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def readings_valid(self) -> bool:
         """Return False when the sock is not on the foot or says its readings are bad.
 
-        A placement alarm (the sock off flag, or the sock off or sensor
-        disconnected bit of the mask) counts on every version 3 sock. The
-        reading flag only on a Dream Sock: older hardware reports 1 with valid
-        readings. Anything absent or unknown never invalidates. A Smart Sock 2
-        is never gated.
+        A placement alarm (the sock off flag, the sock disconnected flag, or
+        the sock off or sensor disconnected bit of the mask) counts on every
+        version 3 sock. The rest follows the Owlet app, which shows dashes instead of vitals in
+        these cases, and only on a Dream Sock: older hardware reports a
+        reading flag of 1 with valid readings. The flag hides readings it
+        calls invalid (1) and those of a sock that was just placed (3), but
+        not a kicking sock (2), which keeps its last value. A sock without
+        link (connection 0 or 1) and a base station that is off hide them as
+        well. Anything absent or unknown never invalidates. A Smart Sock 2 is
+        never gated.
         """
         if self.sock.version == 2:
             return True
         properties = self.sock.properties
         mask = properties.get("alerts_mask")
-        if properties.get("sock_off") or (mask is not None and mask & PLACEMENT_BITS):
+        if (
+            properties.get("sock_off")
+            or self.alert_state("sock_disconnected")
+            or (mask is not None and mask & PLACEMENT_BITS)
+        ):
             return False
-        readings_flag = properties.get("readings_flag")
+        if properties.get("hardware_version") != DREAM_HARDWARE:
+            return True
         return not (
-            properties.get("hardware_version") == DREAM_HARDWARE
-            and readings_flag is not None
-            and readings_flag != 0
+            properties.get("readings_flag") in INVALID_READING_FLAGS
+            or not self.sock_connected
+            or properties.get("base_station_on") is False
         )
+
+    @property
+    def sock_connected(self) -> bool:
+        """Return False when the sock has no link to the base station.
+
+        That is a connection of 0 or 1 or the sock disconnected alert, as in
+        the Owlet app. Unknown counts as connected.
+        """
+        connection = self.sock.properties.get("sock_connection")
+        if connection is not None and connection < SOCK_CONNECTED:
+            return False
+        return not self.alert_state("sock_disconnected")
 
     @property
     def status(self) -> str:
@@ -410,6 +434,7 @@ class OwletCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             readings_flag=properties.get("readings_flag"),
             battery_minutes=properties.get("battery_minutes"),
             alerts={key: self.alert_state(key) for key in STATUS_ALERTS},
+            sock_connected=self.sock_connected,
         )
         has_vitals = any(
             value is not None

@@ -559,7 +559,7 @@ async def test_alarm_bit_16_makes_readings_invalid(
 
 @pytest.mark.freeze_time(COLD_BOOT_TIME)
 @pytest.mark.parametrize(
-    ("srf", "valid"), [(3, False), (1, False), (2, False), (0, True)]
+    ("srf", "valid"), [(3, False), (1, False), (2, True), (0, True)]
 )
 async def test_srf_on_dream_hardware(
     hass: HomeAssistant,
@@ -568,10 +568,74 @@ async def test_srf_on_dream_hardware(
     srf: int,
     valid: bool,
 ) -> None:
-    """On a Dream Sock any reading flag other than 0 means no valid readings."""
+    """On a Dream Sock the app's dashes for 1 and 3 hide the readings, 2 does not."""
     _serve(mock_owlet_api, _live("live_cold_boot", srf=srf))
     await setup_integration(hass, mock_config_entry)
     assert _coordinator(mock_config_entry).readings_valid is valid
+
+
+@pytest.mark.freeze_time(ON_FOOT_TIME)
+@pytest.mark.parametrize(
+    ("vitals", "valid"),
+    [
+        ({"sc": 2}, True),
+        ({"sc": 1}, False),
+        ({"sc": 1, "srf": 2}, False),
+        ({"sc": 0}, False),
+        ({"sc": REMOVE}, True),
+        ({"bso": 0}, False),
+        ({"bso": REMOVE}, True),
+    ],
+)
+async def test_link_and_base_station_on_dream_hardware(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    vitals: dict[str, Any],
+    valid: bool,
+) -> None:
+    """A sock without link and a base station that is off hide the readings."""
+    _serve(mock_owlet_api, _live("live_on_foot", **vitals))
+    await setup_integration(hass, mock_config_entry)
+    assert _coordinator(mock_config_entry).readings_valid is valid
+
+
+@pytest.mark.freeze_time(ON_FOOT_TIME)
+async def test_link_and_base_station_ignored_on_other_hardware(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """Only a Dream Sock hides readings for the link or the base station."""
+    _serve(mock_owlet_api, _live("live_on_foot", hw="obl", sc=1, bso=0))
+    await setup_integration(hass, mock_config_entry)
+    assert _coordinator(mock_config_entry).readings_valid is True
+
+
+@pytest.mark.freeze_time(ON_FOOT_TIME)
+@pytest.mark.parametrize(
+    ("vitals", "flags", "connected"),
+    [
+        ({}, None, True),
+        ({"sc": 1}, None, False),
+        ({"sc": 0}, None, False),
+        ({"sc": REMOVE}, None, True),
+        ({}, {"SOCK_DISCON_ALRT": 1}, False),
+    ],
+)
+async def test_sock_connected(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    *,
+    vitals: dict[str, Any],
+    flags: dict[str, Any] | None,
+    connected: bool,
+) -> None:
+    """No link is a connection below 2 or the disconnected alert; unknown is linked."""
+    _serve(mock_owlet_api, _live("live_on_foot", flags, **vitals))
+    await setup_integration(hass, mock_config_entry)
+    assert _coordinator(mock_config_entry).sock_connected is connected
 
 
 @pytest.mark.freeze_time(COLD_BOOT_TIME)
@@ -712,3 +776,45 @@ async def test_status_with_unreadable_vitals_and_bad_timestamps(
 
     assert coordinator.status == expected
     assert coordinator.readings_valid is True
+
+
+@pytest.mark.freeze_time(ON_FOOT_TIME)
+@pytest.mark.parametrize("hw", ["obs4", "obl"])
+async def test_disconnected_flag_hides_readings_on_every_v3_sock(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    hw: str,
+) -> None:
+    """The sock disconnected alert counts as a placement alarm, flag before mask."""
+    _serve(mock_owlet_api, _live("live_on_foot", {"SOCK_DISCON_ALRT": 1}, hw=hw))
+    await setup_integration(hass, mock_config_entry)
+    assert _coordinator(mock_config_entry).readings_valid is False
+
+
+@pytest.mark.freeze_time(ON_FOOT_TIME)
+async def test_sock_connected_from_the_mask_alone(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """Without a flag property bit 16 of the mask says the sock is disconnected."""
+    data = _live("live_on_foot", alrt=16)
+    del data["response"]["SOCK_DISCON_ALRT"]
+    _serve(mock_owlet_api, data)
+    await setup_integration(hass, mock_config_entry)
+    coordinator = _coordinator(mock_config_entry)
+    assert coordinator.sock_connected is False
+    assert coordinator.readings_valid is False
+
+
+@pytest.mark.freeze_time(ON_FOOT_TIME)
+async def test_status_reports_a_lost_link_before_the_alarm(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+) -> None:
+    """A connection of 1 shows as disconnected right away, like the app."""
+    _serve(mock_owlet_api, _live("live_on_foot", sc=1))
+    await setup_integration(hass, mock_config_entry)
+    assert _coordinator(mock_config_entry).status == "sock_disconnected_from_base"

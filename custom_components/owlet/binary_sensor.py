@@ -19,7 +19,7 @@ from homeassistant.util import dt as dt_util
 from . import OwletConfigEntry, allow_control
 from .coordinator import OwletCoordinator
 from .entity import OwletBaseEntity
-from .owletapi.states import ALERT_BITS, BIT_DATA_NOT_UPDATING, decode_sleep_code
+from .owletapi.states import ALERT_BITS, decode_sleep_code
 
 PARALLEL_UPDATES = 0
 
@@ -51,12 +51,6 @@ def _flag_is_one(key: str) -> Callable[[OwletCoordinator], bool | None]:
     return is_on
 
 
-def _data_not_updating(coordinator: OwletCoordinator) -> bool | None:
-    """Return the data-not-updating bit of the alert mask."""
-    mask = coordinator.sock.properties.get("alerts_mask")
-    return None if mask is None else bool(mask & BIT_DATA_NOT_UPDATING)
-
-
 DERIVED_BINARY_SENSORS: tuple[OwletDerivedBinarySensorDescription, ...] = (
     OwletDerivedBinarySensorDescription(
         key="alert_silenced",
@@ -78,14 +72,6 @@ DERIVED_BINARY_SENSORS: tuple[OwletDerivedBinarySensorDescription, ...] = (
         entity_registry_enabled_default=False,
         source_key="readings_valid",
         is_on_fn=lambda coordinator: coordinator.readings_valid,
-    ),
-    OwletDerivedBinarySensorDescription(
-        key="data_not_updating",
-        translation_key="data_not_updating",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-        source_key="alerts_mask",
-        is_on_fn=_data_not_updating,
     ),
 )
 
@@ -162,7 +148,7 @@ SENSORS: tuple[OwletBinarySensorEntityDescription, ...] = (
     OwletBinarySensorEntityDescription(
         key="sock_off",
         translation_key="sock_off",
-        device_class=BinarySensorDeviceClass.POWER,
+        device_class=BinarySensorDeviceClass.PROBLEM,
         available_during_charging=True,
     ),
     OwletBinarySensorEntityDescription(
@@ -182,24 +168,28 @@ SENSORS: tuple[OwletBinarySensorEntityDescription, ...] = (
         key="preview_high_priority_alarm",
         translation_key="preview_high_alarm",
         device_class=BinarySensorDeviceClass.SOUND,
+        entity_registry_enabled_default=False,
         available_during_charging=True,
     ),
     OwletBinarySensorEntityDescription(
         key="preview_medium_priority_alarm",
         translation_key="preview_med_alarm",
         device_class=BinarySensorDeviceClass.SOUND,
+        entity_registry_enabled_default=False,
         available_during_charging=True,
     ),
     OwletBinarySensorEntityDescription(
         key="preview_low_priority_alarm",
         translation_key="preview_low_alarm",
         device_class=BinarySensorDeviceClass.SOUND,
+        entity_registry_enabled_default=False,
         available_during_charging=True,
     ),
     OwletBinarySensorEntityDescription(
         key="preview_drm_priority_alarm",
         translation_key="preview_drm_alarm",
         device_class=BinarySensorDeviceClass.SOUND,
+        entity_registry_enabled_default=False,
         available_during_charging=True,
     ),
 )

@@ -43,6 +43,7 @@ async def async_get_config_entry_diagnostics(
                 "readings_expected": coordinator.readings_expected,
                 "is_stale": coordinator.is_stale,
                 "readings_valid": coordinator.readings_valid,
+                "sock_connected": coordinator.sock_connected,
                 "status": coordinator.status,
                 "stale_threshold_seconds": (
                     int(threshold.total_seconds()) if threshold else None

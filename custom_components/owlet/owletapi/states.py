@@ -17,14 +17,14 @@ BODY_POSITION_OPTIONS: tuple[str, ...] = (
     "side",
     "tummy",
 )
-READING_FLAG_OPTIONS: tuple[str, ...] = (
-    "normal",
-    "no_valid_readings",
-    "kicking",
-    "just_placed",
+LAST_BASE_CHANGE_OPTIONS: tuple[str, ...] = (
+    "button",
+    "cloud_command",
+    "sock_station",
+    "power_up",
     "unknown",
 )
-BASE_STATE_OPTIONS: tuple[str, ...] = ("on_station", "unknown")
+SIGNAL_QUALITY_OPTIONS: tuple[str, ...] = ("good", "okay", "poor", "disconnected")
 BASE_BATTERY_OPTIONS: tuple[str, ...] = (
     "not_charging",
     "charging",
@@ -83,11 +83,25 @@ ALERT_BITS: dict[str, int] = {
     "discomfort_alert": 4096,
     "lost_power_alert": 8192,
 }
-BIT_DATA_NOT_UPDATING = 128
 PLACEMENT_BITS = 64 | 16
+# Reading flag (srf) values whose vitals the app hides: 1 invalid readings,
+# 3 sock just placed. 2 (kicking) keeps showing the last value.
+INVALID_READING_FLAGS = (1, 3)
+# Sock connection (sc) of a sock with a link to the base station.
+SOCK_CONNECTED = 2
 
 _BASE_BATTERY = {0: "not_charging", 1: "charging", 2: "charged", 3: "fault"}
-_READING_FLAG = {0: "normal", 1: "no_valid_readings", 2: "kicking", 3: "just_placed"}
+# BASE_MON_STATUS: bit 0 is "base station on", the rest is a one-hot code for
+# what caused the last on/off change of the base.
+_LAST_BASE_CHANGE = {
+    2: "button",
+    4: "cloud_command",
+    8: "sock_station",
+    64: "power_up",
+}
+# Sock Bluetooth bands of the Owlet app (bluetoothRssiLevel, lower is better).
+SIGNAL_GOOD_MAX = 70
+SIGNAL_OKAY_MAX = 80
 
 
 def decode_body_position(code: int | None) -> str | None:
@@ -107,18 +121,35 @@ def decode_body_position(code: int | None) -> str | None:
     return "tummy"
 
 
-def decode_reading_flag(code: int | None) -> str | None:
-    """Return the reading flag name for a code."""
+def decode_last_base_change(code: int | None) -> str | None:
+    """Return what caused the last on/off change of the base for a status code.
+
+    Bit 0 (base on) is ignored: 2 and 3 are both the button, 4 and 5 the cloud
+    command. 3 was seen once and is not confirmed. Any other code, such as 32
+    and 33, is unknown.
+    """
     if code is None:
         return None
-    return _READING_FLAG.get(code, "unknown")
+    return _LAST_BASE_CHANGE.get(code & ~1, "unknown")
 
 
-def decode_base_state(code: int | None) -> str | None:
-    """Return the base state name for a code."""
-    if code is None:
+def decode_signal_quality(rssi: float | None, connected: bool) -> str | None:
+    """Return the Sock Bluetooth quality the Owlet app shows for a signal value.
+
+    A sock that is not connected, or reports 0, is disconnected. A missing value
+    is unknown, anything above 80 or negative is poor.
+    """
+    if not connected:
+        return "disconnected"
+    if rssi is None:
         return None
-    return "on_station" if code == 8 else "unknown"
+    if rssi == 0:
+        return "disconnected"
+    if 0 < rssi <= SIGNAL_GOOD_MAX:
+        return "good"
+    if SIGNAL_GOOD_MAX < rssi <= SIGNAL_OKAY_MAX:
+        return "okay"
+    return "poor"
 
 
 def decode_base_battery(code: int | None) -> str | None:
@@ -201,6 +232,9 @@ class StatusInputs:
     readings_flag: int | None
     battery_minutes: float | None
     alerts: Mapping[str, bool | None]
+    # False when the sock has no link to the base station, whatever the alarm
+    # flags say yet: the app shows the disconnected status from the link.
+    sock_connected: bool = True
 
 
 def compute_status(data: StatusInputs | None) -> str:
@@ -241,7 +275,7 @@ def compute_status(data: StatusInputs | None) -> str:
         return "sock_off_baby"
     if on("low_integrity_reading"):
         return "low_light_level"
-    if on("sock_disconnected"):
+    if on("sock_disconnected") or not data.sock_connected:
         return "sock_disconnected_from_base"
     if data.sock_connection == 2 and data.readings_flag == 2:
         return "kicking"

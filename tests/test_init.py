@@ -21,10 +21,10 @@ from custom_components.owlet.owletapi.exceptions import (
 from homeassistant.config_entries import SOURCE_REAUTH, ConfigEntryState
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .conftest import FRESH_TIME, load_json
-from .helpers import setup_integration
+from .helpers import SERIAL, setup_integration
 
 pytestmark = pytest.mark.freeze_time(FRESH_TIME)
 
@@ -284,3 +284,38 @@ async def test_version_2_migration_survives_odd_stored_values(
 
     assert old_entry.state is ConfigEntryState.LOADED
     assert old_entry.options[CONF_STALE_THRESHOLD] == expected
+
+
+@pytest.mark.parametrize(
+    ("platform", "key"),
+    [
+        ("sensor", "battery_status"),
+        ("sensor", "base_state"),
+        ("sensor", "reading_state"),
+        ("sensor", "sleep_code_minute"),
+        ("sensor", "sleep_state_minute"),
+        ("binary_sensor", "data_not_updating"),
+    ],
+)
+async def test_dropped_entities_are_removed_from_the_registry(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    entity_registry: er.EntityRegistry,
+    *,
+    platform: str,
+    key: str,
+) -> None:
+    """An entity of an earlier version does not stay behind as unavailable."""
+    mock_config_entry.add_to_hass(hass)
+    unique_id = f"{SERIAL}-{key}"
+    entity_registry.async_get_or_create(
+        platform, DOMAIN, unique_id, config_entry=mock_config_entry
+    )
+
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entity_registry.async_get_entity_id(platform, DOMAIN, unique_id) is None
+    # Entities that are still provided are left alone.
+    assert entity_registry.async_get_entity_id("sensor", DOMAIN, f"{SERIAL}-heart_rate")

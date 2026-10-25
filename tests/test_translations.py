@@ -34,6 +34,7 @@ def _sensor_descriptions() -> list:
         *sensor.DERIVED_SENSORS,
         sensor.OwletSleepSensor.entity_description,
         sensor.OwletOxygenAverageSensor.entity_description,
+        sensor.OwletSleepHistorySensor.entity_description,
         sensor.OwletLastUpdatedSensor.entity_description,
         sensor.OwletLastRedAlertSensor.entity_description,
     ]

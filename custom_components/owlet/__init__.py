@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping
 import logging
-from typing import Any
+from typing import Any, Final
 
 from aiohttp import ClientError
 
@@ -201,18 +201,35 @@ def _platforms(entry: OwletConfigEntry) -> list[Platform]:
     return PLATFORMS + CONTROL_PLATFORMS if allow_control(entry) else PLATFORMS
 
 
+# Entities of earlier versions that no longer exist: platform and unique id
+# key. Only battery_status was ever released, the rest were in unreleased builds.
+REMOVED_ENTITIES: Final = (
+    (Platform.SENSOR, "battery_status"),
+    (Platform.SENSOR, "base_state"),
+    (Platform.SENSOR, "reading_state"),
+    (Platform.SENSOR, "sleep_code_minute"),
+    (Platform.SENSOR, "sleep_state_minute"),
+    (Platform.BINARY_SENSOR, "data_not_updating"),
+)
+
+
 def _async_remove_stale_entities(hass: HomeAssistant, entry: OwletConfigEntry) -> None:
-    """Remove the base station entity of the mode that is not active.
+    """Remove entities that this version no longer provides.
 
     The base station is a switch with control enabled and a read-only binary
     sensor otherwise. Both share one unique id, so after the option changes
-    the entity of the other kind would stay unavailable forever.
+    the entity of the other kind would stay unavailable forever. Entities that
+    were dropped from the integration would stay unavailable as well.
     """
     stale = Platform.BINARY_SENSOR if allow_control(entry) else Platform.SWITCH
+    removed = [(stale, "base_station_on"), *REMOVED_ENTITIES]
     registry = er.async_get(hass)
     for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
-        if entity.domain == stale and entity.unique_id.endswith("-base_station_on"):
-            _LOGGER.info("Removing base station entity %s", entity.entity_id)
+        if any(
+            entity.domain == platform and entity.unique_id.endswith(f"-{key}")
+            for platform, key in removed
+        ):
+            _LOGGER.info("Removing entity %s", entity.entity_id)
             registry.async_remove(entity.entity_id)
 
 

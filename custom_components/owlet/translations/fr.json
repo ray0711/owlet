@@ -108,7 +108,7 @@
         "name": "Alerte chaussette déconnectée"
       },
       "sock_off": {
-        "name": "Chaussette retirée"
+        "name": "Chaussette retirée du pied"
       },
       "awake": {
         "name": "Réveillé"
@@ -145,17 +145,14 @@
       },
       "readings_valid": {
         "name": "Mesures valides"
-      },
-      "data_not_updating": {
-        "name": "Données non mises à jour"
       }
     },
     "sensor": {
       "batterypercent": {
-        "name": "Pourcentage de batterie"
+        "name": "Batterie de la chaussette"
       },
       "signalstrength": {
-        "name": "Force du signal"
+        "name": "Signal Bluetooth de la chaussette"
       },
       "o2saturation": {
         "name": "Saturation O2"
@@ -167,7 +164,7 @@
         "name": "Fréquence cardiaque"
       },
       "batterymin": {
-        "name": "Autonomie de la batterie restante"
+        "name": "Autonomie restante de la chaussette"
       },
       "skintemp": {
         "name": "Température de la peau"
@@ -186,7 +183,7 @@
         "name": "Mouvement"
       },
       "movementbucket": {
-        "name": "Seuil de mouvement"
+        "name": "Niveau de mouvement (catégorie)"
       },
       "last_updated": {
         "name": "Dernière mesure"
@@ -198,10 +195,7 @@
         "name": "Masque d'alertes"
       },
       "base_mon_status": {
-        "name": "État de surveillance de la base"
-      },
-      "battery_status": {
-        "name": "État de la batterie"
+        "name": "Code d'état de surveillance de la base"
       },
       "status": {
         "name": "Statut",
@@ -232,13 +226,6 @@
           "unknown": "Inconnu"
         }
       },
-      "base_state": {
-        "name": "État de la base",
-        "state": {
-          "on_station": "Chaussette sur la station",
-          "unknown": "Inconnu"
-        }
-      },
       "base_battery": {
         "name": "Batterie de secours de la base",
         "state": {
@@ -263,28 +250,27 @@
           "tummy": "Sur le ventre"
         }
       },
-      "reading_state": {
-        "name": "État de la mesure",
+      "last_base_change": {
+        "name": "Dernier changement de la base",
         "state": {
-          "normal": "Normal",
-          "no_valid_readings": "Aucune mesure valide",
-          "kicking": "Coups de pied",
-          "just_placed": "Vient d'être posée",
+          "button": "Bouton de la base",
+          "cloud_command": "Commande cloud (appli ou Home Assistant)",
+          "sock_station": "Chaussette posée sur la station ou retirée",
+          "power_up": "Mise sous tension",
           "unknown": "Inconnu"
         }
       },
-      "sleep_code_minute": {
-        "name": "Code de sommeil de cette minute"
-      },
-      "sleep_state_minute": {
-        "name": "État de sommeil de cette minute",
+      "signal_quality": {
+        "name": "Qualité Bluetooth de la chaussette",
         "state": {
-          "no_data": "Aucune donnée",
-          "awake": "Réveillé",
-          "light_sleep": "Sommeil léger",
-          "deep_sleep": "Sommeil profond",
-          "unknown": "Inconnu"
+          "good": "Bonne",
+          "okay": "Correcte",
+          "poor": "Mauvaise",
+          "disconnected": "Déconnectée"
         }
+      },
+      "sleep_history": {
+        "name": "Historique du sommeil"
       }
     },
     "switch": {

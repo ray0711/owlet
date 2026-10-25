@@ -108,7 +108,7 @@
         "name": "Sock disconnected alert"
       },
       "sock_off": {
-        "name": "Sock off"
+        "name": "Sock off foot"
       },
       "awake": {
         "name": "Awake"
@@ -145,17 +145,14 @@
       },
       "readings_valid": {
         "name": "Readings valid"
-      },
-      "data_not_updating": {
-        "name": "Data not updating"
       }
     },
     "sensor": {
       "batterypercent": {
-        "name": "Battery percentage"
+        "name": "Sock battery"
       },
       "signalstrength": {
-        "name": "Signal strength"
+        "name": "Sock Bluetooth signal"
       },
       "o2saturation": {
         "name": "O2 saturation"
@@ -167,7 +164,7 @@
         "name": "Heart rate"
       },
       "batterymin": {
-        "name": "Battery remaining"
+        "name": "Sock battery time remaining"
       },
       "skintemp": {
         "name": "Skin temperature"
@@ -186,7 +183,7 @@
         "name": "Movement"
       },
       "movementbucket": {
-        "name": "Movement bucket"
+        "name": "Movement level (bucketed)"
       },
       "last_updated": {
         "name": "Last reading"
@@ -198,10 +195,7 @@
         "name": "Alerts mask"
       },
       "base_mon_status": {
-        "name": "Base monitoring status"
-      },
-      "battery_status": {
-        "name": "Battery status"
+        "name": "Base monitoring status code"
       },
       "status": {
         "name": "Status",
@@ -232,13 +226,6 @@
           "unknown": "Unknown"
         }
       },
-      "base_state": {
-        "name": "Base state",
-        "state": {
-          "on_station": "Sock on station",
-          "unknown": "Unknown"
-        }
-      },
       "base_battery": {
         "name": "Base backup battery",
         "state": {
@@ -263,28 +250,27 @@
           "tummy": "On tummy"
         }
       },
-      "reading_state": {
-        "name": "Reading state",
+      "last_base_change": {
+        "name": "Last base change",
         "state": {
-          "normal": "Normal",
-          "no_valid_readings": "No valid readings",
-          "kicking": "Kicking",
-          "just_placed": "Just placed",
+          "button": "Button on the base",
+          "cloud_command": "Cloud command (app or Home Assistant)",
+          "sock_station": "Sock placed on or lifted from the station",
+          "power_up": "Power-up",
           "unknown": "Unknown"
         }
       },
-      "sleep_code_minute": {
-        "name": "Sleep code of this minute"
-      },
-      "sleep_state_minute": {
-        "name": "Sleep state of this minute",
+      "signal_quality": {
+        "name": "Sock Bluetooth quality",
         "state": {
-          "no_data": "No data",
-          "awake": "Awake",
-          "light_sleep": "Light sleep",
-          "deep_sleep": "Deep sleep",
-          "unknown": "Unknown"
+          "good": "Good",
+          "okay": "Okay",
+          "poor": "Poor",
+          "disconnected": "Disconnected"
         }
+      },
+      "sleep_history": {
+        "name": "Sleep history"
       }
     },
     "switch": {

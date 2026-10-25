@@ -8,7 +8,6 @@ import pytest
 
 from custom_components.owlet.owletapi.states import (
     ALERT_BITS,
-    BIT_DATA_NOT_UPDATING,
     PLACEMENT_BITS,
     STATUS_OPTIONS,
     SleepPoint,
@@ -16,9 +15,9 @@ from custom_components.owlet.owletapi.states import (
     alert_active,
     compute_status,
     decode_base_battery,
-    decode_base_state,
     decode_body_position,
-    decode_reading_flag,
+    decode_last_base_change,
+    decode_signal_quality,
     decode_sleep_code,
     parse_sleep_string,
     sleep_history,
@@ -87,27 +86,48 @@ def test_decode_base_battery(code: int | None, expected: str | None) -> None:
 @pytest.mark.parametrize(
     ("code", "expected"),
     [
-        (0, "normal"),
-        (1, "no_valid_readings"),
-        (2, "kicking"),
-        (3, "just_placed"),
-        (4, "unknown"),
-        (-1, "unknown"),
+        (2, "button"),
+        (3, "button"),
+        (4, "cloud_command"),
+        (5, "cloud_command"),
+        (8, "sock_station"),
+        (9, "sock_station"),
+        (64, "power_up"),
+        (65, "power_up"),
+        (32, "unknown"),
+        (33, "unknown"),
+        (0, "unknown"),
+        (131840, "unknown"),
         (None, None),
     ],
 )
-def test_decode_reading_flag(code: int | None, expected: str | None) -> None:
-    """Reading flag codes are named, others are unknown."""
-    assert decode_reading_flag(code) == expected
+def test_decode_last_base_change(code: int | None, expected: str | None) -> None:
+    """Bit 0 (base on) is ignored; the code names what changed the base last."""
+    assert decode_last_base_change(code) == expected
 
 
 @pytest.mark.parametrize(
-    ("code", "expected"),
-    [(8, "on_station"), (65, "unknown"), (9, "unknown"), (None, None)],
+    ("rssi", "connected", "expected"),
+    [
+        (1, True, "good"),
+        (18, True, "good"),
+        (70, True, "good"),
+        (71, True, "okay"),
+        (79, True, "okay"),
+        (80, True, "okay"),
+        (81, True, "poor"),
+        (-5, True, "poor"),
+        (0, True, "disconnected"),
+        (50, False, "disconnected"),
+        (None, False, "disconnected"),
+        (None, True, None),
+    ],
 )
-def test_decode_base_state(code: int | None, expected: str | None) -> None:
-    """Only 8 is named."""
-    assert decode_base_state(code) == expected
+def test_decode_signal_quality(
+    rssi: float | None, connected: bool, expected: str | None
+) -> None:
+    """The bands of the Owlet app: 1-70 good, 71-80 okay, else poor."""
+    assert decode_signal_quality(rssi, connected) == expected
 
 
 @pytest.mark.parametrize(
@@ -153,7 +173,6 @@ def test_alert_constants() -> None:
     assert ALERT_BITS["low_oxygen_alert"] == 1
     assert ALERT_BITS["sock_off"] == 64
     assert ALERT_BITS["lost_power_alert"] == 8192
-    assert BIT_DATA_NOT_UPDATING == 128
     assert PLACEMENT_BITS == 80
 
 
@@ -218,6 +237,12 @@ def _inputs(**kwargs: object) -> StatusInputs:
         ),
         (12, _inputs(sock_connection=2, readings_flag=2), "kicking"),
         (13, _inputs(readings_flag=3), "sock_recently_placed"),
+        (13, _inputs(sock_connected=False), "sock_disconnected_from_base"),
+        (
+            13,
+            _inputs(sock_connected=False, readings_flag=2),
+            "sock_disconnected_from_base",
+        ),
         (14, _inputs(readings_flag=1), "sock_readings_invalid"),
         (15, _inputs(sock_connection=2, battery_minutes=239), "low_sock_battery"),
         (16, _inputs(), "normal"),

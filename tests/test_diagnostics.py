@@ -78,6 +78,7 @@ async def test_diagnostics_has_new_fields(
 
     sock = result["socks"][0]
     assert sock["readings_valid"] is False
+    assert sock["sock_connected"] is True
     assert sock["status"] == "sock_off_baby"
     assert sock["stale_threshold_seconds"] == 300
 

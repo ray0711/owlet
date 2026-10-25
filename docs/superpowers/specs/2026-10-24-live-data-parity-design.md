@@ -95,6 +95,8 @@ Resulting behaviour: a sock lifted off the foot hides its frozen vitals about 10
 
 ## 7. Entities
 
+(Superseded by revision 5 at the end of this document: `base_state`, `reading_state`, `data_not_updating`, `sleep_code_minute` and `sleep_state_minute` were removed, `last_base_change`, `signal_quality` and `sleep_history` added, and the `battery_status` sensor dropped.)
+
 New entities (all read-only, unique id `{serial}-{key}`, created when the source key is present). "Charging" says whether the entity stays available while the sock charges.
 
 | Key | Platform | Source key | Value | Default | Charging |
@@ -214,3 +216,15 @@ Taken
 9. Sleep codes are decoded by band (0 no data, 1-5 awake, 6-10 light, 11-15 deep) with the raw code kept in an attribute; the band edges are inferred and get checked against a night capture before release.
 10. A numeric sensor `sleep_code_minute` with the raw per-minute code (0 to 15) is added next to the text enum so the sleep state can be graphed.
 11. The app's status line is built now as a first version (7.1) and refined when more information is available.
+
+## Revision 5 (after the night capture, the recorder export and a second app-source round)
+
+Evidence: `owlet-capture4.log` (18:46Z to 05:47Z), `history_2.csv`, `notes/app-source-round2.md`. Changes against revision 4:
+
+- **Worn-sock rule (Dream Sock):** hide vitals on a placement alarm, `srf` 1 and 3, `sc` below 2 and a base station that is off (the app shows dashes in all of these). `srf` 2 (kicking) stays valid; the app's dial keeps the last value. Measured: `srf` 1/2 mostly repeat the previous reading, `srf` 3 follows a start of monitoring with plausible readings but also a sock on a table with a frozen heart rate.
+- **Sleep history:** the history lives on its own diagnostic timestamp sensor `sleep_history` (always available, state = time of the newest minute, attribute `history`, not recorded); `sleep_state` keeps `sleep_code`.
+- **Status and hiding:** `sock_connected` (connection below 2 or the sock disconnected alert) makes the status line report `sock_disconnected_from_base` and, with the disconnected flag counted as a placement alarm on every version 3 sock, hides vitals.
+- **Sleep:** the app always decodes by band (1 to 5, 6 to 10, 11 to 15); the sock only sent 0, 1, 8 and 15. `ss` equalled the newest `sh` digit in 251 of 252 snapshots, so the per-minute sensors were duplicates: **Sleep state of this minute** and **Sleep code of this minute** are removed, the raw code (`sleep_code`) and the `history` are attributes of **Sleep state**.
+- **Removed:** `reading_state` (equals the status line), `data_not_updating` (bit 128 is not used on a Dream Sock), `battery_status` (equals `base_battery`), `base_state` (replaced).
+- **Added:** `last_base_change` (the cause code of `BASE_MON_STATUS`: button 2/3, cloud command 4/5, sock station 8/9, power-up 64/65, else unknown) and `signal_quality` (app bands: 1 to 70 good, 71 to 80 okay, above 80 poor, 0 or no link disconnected). This corrects the earlier note that the app does not show the sock signal.
+- **Names and defaults:** clearer names (sock battery, sock Bluetooth signal, sock off foot, ...), the four preview alarms disabled by default, `sock_off` device class problem.

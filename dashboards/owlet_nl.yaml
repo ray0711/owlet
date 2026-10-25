@@ -48,7 +48,7 @@ views:
                 color: state
 
               - type: entity
-                entity: sensor.owlet_sock_serial_number_batterijniveau
+                entity: sensor.owlet_sock_serial_number_batterijniveau_sok
                 icon: mdi:battery
                 show_state: true
                 color: state
@@ -147,13 +147,13 @@ views:
             icon: mdi:sock
             badges:
               - type: entity
-                entity: sensor.owlet_sock_serial_number_batterijniveau
+                entity: sensor.owlet_sock_serial_number_batterijniveau_sok
                 icon: mdi:battery
                 show_state: true
                 color: state
 
           - type: tile
-            entity: sensor.owlet_sock_serial_number_batterijniveau
+            entity: sensor.owlet_sock_serial_number_batterijniveau_sok
             name: Batterij
             icon: mdi:battery
             color: green
@@ -163,7 +163,7 @@ views:
                 detail: false
 
           - type: tile
-            entity: sensor.owlet_sock_serial_number_resterende_batterijduur
+            entity: sensor.owlet_sock_serial_number_resterende_batterijduur_sok
             name: Resterende batterijduur
             icon: mdi:timer-outline
             color: green
@@ -181,13 +181,13 @@ views:
 
           # Enkel zichtbaar wanneer de sok uit is
           - type: tile
-            entity: binary_sensor.owlet_sock_serial_number_sok_uit
+            entity: binary_sensor.owlet_sock_serial_number_sok_van_de_voet
             name: Sok is uit
             icon: mdi:sock
             color: orange
             visibility:
               - condition: state
-                entity: binary_sensor.owlet_sock_serial_number_sok_uit
+                entity: binary_sensor.owlet_sock_serial_number_sok_van_de_voet
                 state: "on"
 
           - type: tile
@@ -410,7 +410,7 @@ views:
                 name: Slaap
               - entity: binary_sensor.owlet_sock_serial_number_wakker
                 name: Wakker
-              - entity: binary_sensor.owlet_sock_serial_number_sok_uit
+              - entity: binary_sensor.owlet_sock_serial_number_sok_van_de_voet
                 name: Sok uit
             grid_options:
               columns: full
@@ -479,13 +479,13 @@ views:
             icon: mdi:battery
             badges:
               - type: entity
-                entity: sensor.owlet_sock_serial_number_batterijniveau
+                entity: sensor.owlet_sock_serial_number_batterijniveau_sok
                 icon: mdi:battery
                 show_state: true
                 color: state
 
               - type: entity
-                entity: sensor.owlet_sock_serial_number_resterende_batterijduur
+                entity: sensor.owlet_sock_serial_number_resterende_batterijduur_sok
                 icon: mdi:timer-outline
                 show_state: true
 
@@ -493,7 +493,7 @@ views:
             title: Batterij, afgelopen 48 uur
             hours_to_show: 48
             entities:
-              - entity: sensor.owlet_sock_serial_number_batterijniveau
+              - entity: sensor.owlet_sock_serial_number_batterijniveau_sok
                 name: Batterij
             grid_options:
               columns: full

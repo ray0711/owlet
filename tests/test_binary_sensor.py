@@ -48,14 +48,47 @@ async def test_binary_sensors_asleep(
     assert _state(hass, "data_stale") == STATE_OFF
     for alert in ALERTS:
         assert _state(hass, alert) == STATE_OFF, alert
-    for key in (
-        "discomfort_alert",
-        "low_integrity_reading",
-        "preview_high_priority_alarm",
-        "preview_medium_priority_alarm",
-        "preview_low_priority_alarm",
-        "preview_drm_priority_alarm",
-    ):
+    for key in ("discomfort_alert", "low_integrity_reading"):
+        assert _state(hass, key) == STATE_OFF, key
+
+
+PREVIEW_ALARMS = (
+    "preview_high_priority_alarm",
+    "preview_medium_priority_alarm",
+    "preview_low_priority_alarm",
+    "preview_drm_priority_alarm",
+)
+
+
+async def test_preview_alarms_disabled_by_default(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """The preview alarms only echo the app's test alarms, so they start disabled."""
+    await setup_integration(hass, mock_config_entry)
+
+    for key in PREVIEW_ALARMS:
+        entry = entity_registry.async_get(entity_id(hass, "binary_sensor", key))
+        assert entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION, key
+        assert hass.states.get(entry.entity_id) is None, key
+
+
+async def test_preview_alarms_off_when_enabled(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_owlet_api: dict[str, AsyncMock],
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """An enabled preview alarm shows the property."""
+    mock_config_entry.add_to_hass(hass)
+    for key in PREVIEW_ALARMS:
+        _enable(entity_registry, mock_config_entry, key)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    for key in PREVIEW_ALARMS:
         assert _state(hass, key) == STATE_OFF, key
 
 
@@ -313,49 +346,6 @@ async def test_readings_valid_on_foot(
     assert _state(hass, "readings_valid") == STATE_ON
 
 
-async def test_data_not_updating_bit(
-    hass: HomeAssistant,
-    mock_config_entry: MockConfigEntry,
-    mock_owlet_api: dict[str, AsyncMock],
-    entity_registry: er.EntityRegistry,
-    freezer,
-) -> None:
-    """Bit 128 of the alert mask turns data_not_updating on; off by default."""
-    freezer.move_to(ON_FOOT)
-    _patch_vitals(mock_owlet_api, "live_on_foot.json", alrt=128)
-    await setup_integration(hass, mock_config_entry)
-    entry = entity_registry.async_get(
-        entity_id(hass, "binary_sensor", "data_not_updating")
-    )
-    assert entry.disabled_by is er.RegistryEntryDisabler.INTEGRATION
-    assert entry.entity_category is er.EntityCategory.DIAGNOSTIC
-
-    await hass.config_entries.async_unload(mock_config_entry.entry_id)
-    entity_registry.async_update_entity(entry.entity_id, disabled_by=None)
-    await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert _state(hass, "data_not_updating") == STATE_ON
-
-
-async def test_data_not_updating_off_without_bit(
-    hass: HomeAssistant,
-    mock_config_entry: MockConfigEntry,
-    mock_owlet_api: dict[str, AsyncMock],
-    entity_registry: er.EntityRegistry,
-    freezer,
-) -> None:
-    """Without bit 128 data_not_updating is off."""
-    freezer.move_to(ON_FOOT)
-    _patch_vitals(mock_owlet_api, "live_on_foot.json", alrt=0)
-    mock_config_entry.add_to_hass(hass)
-    _enable(entity_registry, mock_config_entry, "data_not_updating")
-    await hass.config_entries.async_setup(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert _state(hass, "data_not_updating") == STATE_OFF
-
-
 async def test_sock_off_sensor_follows_flag_then_mask(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
@@ -450,7 +440,6 @@ async def test_new_entities_not_created_for_v2(
         "alert_silenced",
         "recovery_mode",
         "readings_valid",
-        "data_not_updating",
     ):
         assert (
             entity_registry.async_get_entity_id(

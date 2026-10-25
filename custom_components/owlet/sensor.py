@@ -28,15 +28,15 @@ from .coordinator import OwletCoordinator
 from .entity import OwletBaseEntity
 from .owletapi.states import (
     BASE_BATTERY_OPTIONS,
-    BASE_STATE_OPTIONS,
     BODY_POSITION_OPTIONS,
-    READING_FLAG_OPTIONS,
+    LAST_BASE_CHANGE_OPTIONS,
+    SIGNAL_QUALITY_OPTIONS,
     SLEEP_OPTIONS,
     STATUS_OPTIONS,
     decode_base_battery,
-    decode_base_state,
     decode_body_position,
-    decode_reading_flag,
+    decode_last_base_change,
+    decode_signal_quality,
     decode_sleep_code,
     sleep_history,
 )
@@ -71,7 +71,7 @@ def _property(coordinator: OwletCoordinator, key: str) -> Any:
     return coordinator.sock.properties.get(key)
 
 
-def _base_state_attributes(coordinator: OwletCoordinator) -> dict[str, Any]:
+def _base_change_attributes(coordinator: OwletCoordinator) -> dict[str, Any]:
     """Return the raw base status split into its monitoring bit and code."""
     raw = _property(coordinator, "base_monitoring_status")
     if raw is None:
@@ -99,32 +99,11 @@ def _session_started(coordinator: OwletCoordinator) -> datetime | None:
         return None
 
 
-def _minute_code(coordinator: OwletCoordinator) -> int | None:
-    """Return the newest per-minute sleep code, None when absent or unreadable."""
-    codes = coordinator.sock.sleep_codes
-    return codes[0] if codes else None
-
-
-def _minute_state(coordinator: OwletCoordinator) -> str | None:
-    """Return the band name of the newest per-minute sleep code."""
-    return decode_sleep_code(_minute_code(coordinator))
-
-
-def _minute_attributes(coordinator: OwletCoordinator) -> dict[str, Any]:
-    """Return the per-minute history and the cloud time it hangs on.
-
-    Without a usable cloud time the history stays empty rather than guessed.
-    """
-    updated = coordinator.sock.sleep_updated_at
-    codes = coordinator.sock.sleep_codes
-    history = sleep_history(codes, updated) if updated is not None else []
-    return {
-        "history": [
-            {"time": point.time.isoformat(), "state": point.state, "raw": point.raw}
-            for point in history
-        ],
-        "updated": updated.isoformat() if updated is not None else None,
-    }
+def _signal_quality(coordinator: OwletCoordinator) -> str | None:
+    """Return the app's Good, Okay or Poor for the Bluetooth signal of the sock."""
+    return decode_signal_quality(
+        _property(coordinator, "signal_strength"), coordinator.sock_connected
+    )
 
 
 SENSORS: tuple[OwletSensorEntityDescription, ...] = (
@@ -193,7 +172,7 @@ SENSORS: tuple[OwletSensorEntityDescription, ...] = (
         needs_worn_sock=True,
     ),
     # Raw status codes from the device, useful when checking what the sock
-    # reports during an alert. Their meaning is not documented by Owlet.
+    # reports during an alert. Owlet does not document their meaning.
     OwletSensorEntityDescription(
         key="alerts_mask",
         translation_key="alerts_mask",
@@ -203,12 +182,6 @@ SENSORS: tuple[OwletSensorEntityDescription, ...] = (
     OwletSensorEntityDescription(
         key="base_monitoring_status",
         translation_key="base_mon_status",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        available_during_charging=True,
-    ),
-    OwletSensorEntityDescription(
-        key="battery_status",
-        translation_key="battery_status",
         entity_category=EntityCategory.DIAGNOSTIC,
         available_during_charging=True,
     ),
@@ -226,17 +199,16 @@ DERIVED_SENSORS: tuple[OwletDerivedSensorDescription, ...] = (
         always_available=True,
     ),
     OwletDerivedSensorDescription(
-        key="base_state",
-        translation_key="base_state",
+        key="last_base_change",
+        translation_key="last_base_change",
         device_class=SensorDeviceClass.ENUM,
-        options=list(BASE_STATE_OPTIONS),
+        options=list(LAST_BASE_CHANGE_OPTIONS),
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
         source_key="base_monitoring_status",
-        value_fn=lambda coordinator: decode_base_state(
+        value_fn=lambda coordinator: decode_last_base_change(
             _property(coordinator, "base_monitoring_status")
         ),
-        attributes_fn=_base_state_attributes,
+        attributes_fn=_base_change_attributes,
         available_during_charging=True,
     ),
     OwletDerivedSensorDescription(
@@ -272,35 +244,13 @@ DERIVED_SENSORS: tuple[OwletDerivedSensorDescription, ...] = (
         needs_worn_sock=True,
     ),
     OwletDerivedSensorDescription(
-        key="reading_state",
-        translation_key="reading_state",
+        key="signal_quality",
+        translation_key="signal_quality",
         device_class=SensorDeviceClass.ENUM,
-        options=list(READING_FLAG_OPTIONS),
+        options=list(SIGNAL_QUALITY_OPTIONS),
         entity_category=EntityCategory.DIAGNOSTIC,
-        entity_registry_enabled_default=False,
-        source_key="readings_flag",
-        value_fn=lambda coordinator: decode_reading_flag(
-            _property(coordinator, "readings_flag")
-        ),
-        attributes_fn=_raw_attribute("readings_flag"),
-        available_during_charging=True,
-    ),
-    OwletDerivedSensorDescription(
-        key="sleep_code_minute",
-        translation_key="sleep_code_minute",
-        state_class=SensorStateClass.MEASUREMENT,
-        source_key=MOBILE_VITALS,
-        value_fn=_minute_code,
-        available_during_charging=True,
-    ),
-    OwletDerivedSensorDescription(
-        key="sleep_state_minute",
-        translation_key="sleep_state_minute",
-        device_class=SensorDeviceClass.ENUM,
-        options=list(SLEEP_OPTIONS),
-        source_key=MOBILE_VITALS,
-        value_fn=_minute_state,
-        attributes_fn=_minute_attributes,
+        source_key="signal_strength",
+        value_fn=_signal_quality,
         available_during_charging=True,
     ),
 )
@@ -314,10 +264,16 @@ def _is_created(
     """Return if the sock gets this derived sensor.
 
     The status line is computed from several properties, so it exists for
-    every Smart Sock 3 / Dream Sock instead of following one source key.
+    every Smart Sock 3 / Dream Sock instead of following one source key. The
+    signal quality uses the bands of the Smart Sock 3 / Dream Sock only.
     """
     if description.key == "status":
         return coordinator.sock.version == 3
+    if description.key == "signal_quality":
+        return (
+            coordinator.sock.version == 3
+            and description.source_key in coordinator.sock.properties
+        )
     return description.source_key in coordinator.sock.properties or (
         description.source_key in (coordinator.sock.raw_properties or {})
     )
@@ -347,6 +303,8 @@ async def async_setup_entry(
             sensors.append(OwletSleepSensor(coordinator))
         if OwletOxygenAverageSensor.entity_description.key in properties:
             sensors.append(OwletOxygenAverageSensor(coordinator))
+        if MOBILE_VITALS in (coordinator.sock.raw_properties or {}):
+            sensors.append(OwletSleepHistorySensor(coordinator))
         sensors.append(OwletLastUpdatedSensor(coordinator))
         if RED_ALERT_SUMMARY in (coordinator.sock.raw_properties or {}):
             sensors.append(OwletLastRedAlertSensor(coordinator))
@@ -390,8 +348,6 @@ class OwletDerivedSensor(OwletBaseEntity, SensorEntity):
     """A sensor derived from a property or the coordinator."""
 
     entity_description: OwletDerivedSensorDescription
-    # The per-minute history changes every minute and would be stored in full.
-    _unrecorded_attributes = frozenset({"history"})
 
     def __init__(
         self,
@@ -451,6 +407,52 @@ class OwletSleepSensor(OwletSensor):
     def native_value(self) -> StateType:
         """Return the sleep band of the sock's sleep code."""
         return decode_sleep_code(self.sock.properties.get("sleep_state")) or "unknown"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the raw sleep code of the sock."""
+        return {"sleep_code": self.sock.properties.get("sleep_state")}
+
+
+class OwletSleepHistorySensor(OwletBaseEntity, SensorEntity):
+    """The sleep state of the last 15 minutes, one character per minute.
+
+    Unlike the sleep state it is always available: a history stays true when
+    the sock is off the foot or charging, and every minute carries its own
+    time. The state is the cloud time of the newest minute. Without a usable
+    cloud time the history stays empty rather than guessed.
+    """
+
+    # The history changes every minute and would be stored in full.
+    _unrecorded_attributes = frozenset({"history"})
+    entity_description = SensorEntityDescription(
+        key="sleep_history",
+        translation_key="sleep_history",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    )
+
+    def __init__(self, coordinator: OwletCoordinator) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self.sock.serial}-sleep_history"
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Return the cloud time of the newest minute."""
+        return self.sock.sleep_updated_at
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the minutes, newest first, each with time, state and raw code."""
+        updated = self.sock.sleep_updated_at
+        history = sleep_history(self.sock.sleep_codes, updated) if updated else []
+        return {
+            "history": [
+                {"time": p.time.isoformat(), "state": p.state, "raw": p.raw}
+                for p in history
+            ]
+        }
 
 
 class OwletOxygenAverageSensor(OwletSensor):

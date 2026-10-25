@@ -58,7 +58,7 @@ views:
             entity: sensor.owlet_sock_serial_number_sleep_state
             name: Sleep state
           - type: tile
-            entity: binary_sensor.owlet_sock_serial_number_sock_off
+            entity: binary_sensor.owlet_sock_serial_number_sock_off_foot
             name: Sock off
           - type: tile
             entity: binary_sensor.owlet_sock_serial_number_charging
@@ -198,7 +198,7 @@ views:
             entities:
               - entity: sensor.owlet_sock_serial_number_sleep_state
                 name: Sleep state
-              - entity: binary_sensor.owlet_sock_serial_number_sock_off
+              - entity: binary_sensor.owlet_sock_serial_number_sock_off_foot
                 name: Sock off
               - entity: binary_sensor.owlet_sock_serial_number_data_stale
                 name: Data stale
@@ -252,13 +252,13 @@ views:
             heading: Device
             icon: mdi:battery-heart-variant
           - type: tile
-            entity: sensor.owlet_sock_serial_number_battery_percentage
+            entity: sensor.owlet_sock_serial_number_sock_battery
             name: Battery
           - type: tile
-            entity: sensor.owlet_sock_serial_number_battery_remaining
+            entity: sensor.owlet_sock_serial_number_sock_battery_time_remaining
             name: Battery remaining
           - type: tile
-            entity: sensor.owlet_sock_serial_number_signal_strength
+            entity: sensor.owlet_sock_serial_number_sock_bluetooth_signal
             name: Signal
           - type: tile
             entity: sensor.owlet_sock_serial_number_last_reading
@@ -270,7 +270,7 @@ views:
             title: Battery
             hours_to_show: 48
             entities:
-              - entity: sensor.owlet_sock_serial_number_battery_percentage
+              - entity: sensor.owlet_sock_serial_number_sock_battery
                 name: Battery
             grid_options:
               columns: full
